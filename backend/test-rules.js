@@ -4,9 +4,9 @@ const knex = require('knex')(require('./knexfile').development);
 async function expectFail(label, fn) {
     try {
         await fn();
-        console.log(`❌ ${label}: was ALLOWED (should fail)`);
+        console.log(` ${label}: was ALLOWED (should fail)`);
     } catch (e) {
-        console.log(`✅ ${label}: blocked → ${e.message.split('\n')[0].slice(0, 90)}`);
+        console.log(` ${label}: blocked → ${e.message.split('\n')[0].slice(0, 90)}`);
     }
 }
 

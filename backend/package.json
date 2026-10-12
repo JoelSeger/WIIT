@@ -16,5 +16,8 @@
     "knex": "^3.3.0",
     "mssql": "^12.7.2",
     "tedious": "^20.3.3"
+  },
+  "devDependencies": {
+    "better-sqlite3": "^13.0.3"
   }
 }
