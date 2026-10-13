@@ -3,3 +3,4 @@ node_modules/
 .vpprefdata/
 .lock
 .idea/
+.angular/cache/
