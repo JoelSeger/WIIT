@@ -1,5 +1,5 @@
 require('dotenv').config();
-const knex = require('knex')(require('./knexfile').development);
+const knex = require('knex')(require('../knexfile').development);
 
 (async () => {
     const rows = await knex.raw(`

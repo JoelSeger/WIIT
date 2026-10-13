@@ -1,4 +1,4 @@
-const knex = require('knex')(require('./knexfile').development);
+const knex = require('knex')(require('../knexfile').development);
 
 async function main() {
     // 1. Read both trees with a recursive query
