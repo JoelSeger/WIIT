@@ -26,7 +26,7 @@ exports.up = async function (knex) {
     t.text('description');
     t.string('portal_url', 1000);
   });
-  // Plain SQL on purpose: Knex does not fill in ?? bindings for a CHECK added via alterTable
+  // Knex does not fill in ?? bindings for a CHECK added via alterTable
   await knex.raw(`
     ALTER TABLE nodes ADD CONSTRAINT ck_nodes_valid_range
       CHECK (valid_from IS NULL OR valid_to IS NULL OR valid_from <= valid_to)

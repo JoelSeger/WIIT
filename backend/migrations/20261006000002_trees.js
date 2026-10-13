@@ -13,9 +13,8 @@
  */
 
 exports.up = async function (knex) {
-  // ---------------------------------------------------------------------------
+
   // structures
-  // ---------------------------------------------------------------------------
   await knex.schema.createTable('structures', (t) => {
     t.increments('id').primary();
     t.string('code', 50).notNullable().unique();          // 'klass-2021', 'forvaring'

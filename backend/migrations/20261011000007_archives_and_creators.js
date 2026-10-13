@@ -25,10 +25,9 @@
 const STRUCTURE_TYPES = "('klassificering','arkivforteckning','forvaring')";
 
 exports.up = async function (knex) {
-  // ---------------------------------------------------------------------------
-  // 1. Three structure types. 'struktur' is renamed to 'klassificering' – clearer
-  //    now that there are two kinds of "structure" trees.
-  // ---------------------------------------------------------------------------
+
+  // 1. Three structure types. 'struktur' is renamed to 'klassificering'
+
   await knex.raw('ALTER TABLE structures DROP CONSTRAINT ck_structures_type');
   await knex.raw('ALTER TABLE node_types DROP CONSTRAINT ck_node_types_structure_type');
   await knex('structures').where({ structure_type: 'struktur' }).update({ structure_type: 'klassificering' });
@@ -38,23 +37,22 @@ exports.up = async function (knex) {
   await knex.raw(`ALTER TABLE node_types ADD CONSTRAINT ck_node_types_structure_type
                   CHECK (structure_type IN ${STRUCTURE_TYPES})`);
 
-  // ---------------------------------------------------------------------------
-  // 2. Versions of a structure (Lilas: version, previous_name, previous_version)
-  // ---------------------------------------------------------------------------
+
+  // 2. Versions of a structure
+
   await knex.schema.alterTable('structures', (t) => {
     t.string('version', 50);                                // '2021', '2.0'
     t.integer('previous_structure_id')                      // the structure this one replaces
       .references('id').inTable('structures').onDelete('NO ACTION');
   });
 
-  // Old beteckning after renumbering (Lilas: previous_designation)
+
   await knex.schema.alterTable('nodes', (t) => {
     t.string('previous_reference_code', 100);
   });
 
-  // ---------------------------------------------------------------------------
+
   // 3. archive_creators – arkivbildare
-  // ---------------------------------------------------------------------------
   await knex.schema.createTable('archive_creators', (t) => {
     t.increments('id').primary();
     t.integer('parent_id');                                 // NULL = top level
@@ -84,9 +82,8 @@ exports.up = async function (knex) {
       ON archive_creators (external_id) WHERE external_id IS NOT NULL
   `);
 
-  // ---------------------------------------------------------------------------
+
   // 4. archives – arkiv
-  // ---------------------------------------------------------------------------
   await knex.schema.createTable('archives', (t) => {
     t.increments('id').primary();
     t.integer('archive_creator_id').notNullable()
@@ -112,9 +109,8 @@ exports.up = async function (knex) {
       ON archives (reference_code) WHERE reference_code IS NOT NULL
   `);
 
-  // ---------------------------------------------------------------------------
+
   // 5. archive_structures – which structures an archive uses, and when
-  // ---------------------------------------------------------------------------
   await knex.schema.createTable('archive_structures', (t) => {
     t.increments('id').primary();
     t.integer('archive_id').notNullable()

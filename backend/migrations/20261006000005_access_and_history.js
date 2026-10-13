@@ -9,9 +9,8 @@
  */
 
 exports.up = async function (knex) {
-  // ---------------------------------------------------------------------------
+
   // ad_group_roles
-  // ---------------------------------------------------------------------------
   await knex.schema.createTable('ad_group_roles', (t) => {
     t.increments('id').primary();
     t.string('ad_group', 255).notNullable();              // AD group objectId or name
@@ -32,9 +31,7 @@ exports.up = async function (knex) {
       ON ad_group_roles (ad_group, role, structure_id) WHERE structure_id IS NOT NULL
   `);
 
-  // ---------------------------------------------------------------------------
   // change_log – append-only; no FKs to the changed rows so history survives deletes
-  // ---------------------------------------------------------------------------
   await knex.schema.createTable('change_log', (t) => {
     t.bigIncrements('id').primary();
     t.string('entity_type', 50).notNullable();            // 'node', 'structure', 'node_relation' …
@@ -55,9 +52,8 @@ exports.up = async function (knex) {
     t.index(['structure_id', 'changed_at'], 'ix_change_log_structure');
   });
 
-  // ---------------------------------------------------------------------------
+
   // structure_versions – manual snapshots of a whole tree
-  // ---------------------------------------------------------------------------
   await knex.schema.createTable('structure_versions', (t) => {
     t.increments('id').primary();
     t.integer('structure_id').notNullable()
@@ -73,9 +69,8 @@ exports.up = async function (knex) {
     t.check('ISJSON(??) = 1', ['snapshot'], 'ck_structure_versions_json');
   });
 
-  // ---------------------------------------------------------------------------
+
   // transfer_jobs – EAD3 / FGS / RA-FS import & export history
-  // ---------------------------------------------------------------------------
   await knex.schema.createTable('transfer_jobs', (t) => {
     t.increments('id').primary();
     t.string('direction', 10).notNullable();              // 'import' | 'export'

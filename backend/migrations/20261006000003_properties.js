@@ -12,9 +12,8 @@
  */
 
 exports.up = async function (knex) {
-  // ---------------------------------------------------------------------------
+
   // property_definitions
-  // ---------------------------------------------------------------------------
   await knex.schema.createTable('property_definitions', (t) => {
     t.increments('id').primary();
     t.integer('node_type_id').notNullable()
@@ -34,9 +33,8 @@ exports.up = async function (knex) {
       ['data_type'], 'ck_property_definitions_data_type');
   });
 
-  // ---------------------------------------------------------------------------
+
   // node_property_values – one typed column per data_type, only one is used
-  // ---------------------------------------------------------------------------
   await knex.schema.createTable('node_property_values', (t) => {
     t.increments('id').primary();
     t.integer('node_id').notNullable()
