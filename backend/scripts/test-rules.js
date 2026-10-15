@@ -12,7 +12,7 @@ async function expectFail(label, fn) {
 
 (async () => {
     await expectFail('Delete parent with children', () =>
-        knex('nodes').where('reference_code', 'F').del());
+        knex('nodes').where('reference_code', 'A-3').del());
 
     await expectFail('Delete node with relation', () =>
         knex('nodes').where('reference_code', 'F2').del());
