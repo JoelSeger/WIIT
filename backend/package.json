@@ -17,11 +17,10 @@
   "dependencies": {
     "dotenv": "^18.0.5",
     "express": "^5.2.1",
+    "fast-xml-parser": "^5.11.2",
     "knex": "^3.3.0",
     "mssql": "^12.7.2",
+    "multer": "^2.4.0",
     "tedious": "^20.3.3"
-  },
-  "devDependencies": {
-    "better-sqlite3": "^13.0.3"
   }
 }

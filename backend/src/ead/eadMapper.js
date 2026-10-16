@@ -1,3 +1,4 @@
+
 function asObject(value) {
   if (Array.isArray(value)) {
     return asObject(value[0]);
@@ -49,6 +50,19 @@ function textValue(value) {
   return collectText(value) || null;
 }
 
+function scopeContentValue(value) {
+  const text = collectText(value);
+
+  if (!text) return null;
+
+  return (
+    text
+      .replace(/&lt;br\s*\/?&gt;/gi, "\n")
+      .replace(/\r\n/g, "\n")
+      .trim() || null
+  );
+}
+
 function attribute(object, name) {
   return textValue(asObject(object)[`@_${name}`]);
 }
@@ -56,6 +70,7 @@ function attribute(object, name) {
 function firstText(...values) {
   for (const value of values) {
     const text = textValue(value);
+
     if (text) return text;
   }
 
@@ -68,7 +83,10 @@ function componentEntries(source) {
   for (const [key, value] of Object.entries(asObject(source))) {
     if (/^c(?:0[1-9]|1[0-2])?$/.test(key)) {
       for (const item of asArray(value)) {
-        result.push({ elementName: key, value: item });
+        result.push({
+          elementName: key,
+          value: item,
+        });
       }
     }
   }
@@ -76,33 +94,50 @@ function componentEntries(source) {
   return result;
 }
 
+function mapDidNotes(did) {
+  return asArray(asObject(did).didnote).map((item) => ({
+    localtype: attribute(item, "localtype"),
+    text: textValue(item),
+  }));
+}
+
 class EadMapper {
   map(parsed, errors = [], warnings = []) {
     const ead = child(parsed, "ead");
     const control = child(ead, "control");
-    const filedesc = child(control, "filedesc");
-    const titlestmt = child(filedesc, "titlestmt");
+    const languageDeclaration = child(
+      control,
+      "languagedeclaration"
+    );
+    const fileDescription = child(control, "filedesc");
+    const titleStatement = child(fileDescription, "titlestmt");
     const archdesc = child(ead, "archdesc");
-
-    const did = child(archdesc, "did");
 
     const metadata = {
       recordId: firstText(control.recordid),
-      titleProper: firstText(titlestmt.titleproper),
-      edition: firstText(titlestmt.editionstmt),
+      titleProper: firstText(titleStatement.titleproper),
+      edition: firstText(
+        child(fileDescription, "editionstmt").edition
+      ),
       agencyName: firstText(
-        control.maintenanceagency?.agencyname,
+        child(control, "maintenanceagency").agencyname,
         control.maintenanceagency
       ),
-      countryCode: attribute(control, "countryencoding") || "SE",
-      languageCode: attribute(control, "langencoding"),
-      scriptCode: null,
+      countryCode: null,
+      languageCode: firstText(
+        ...asArray(languageDeclaration.language).map((language) =>
+          attribute(language, "langcode")
+        )
+      ),
+      scriptCode: firstText(
+        ...asArray(languageDeclaration.script).map((script) =>
+          attribute(script, "scriptcode")
+        )
+      ),
       publicationStatus: attribute(control, "audience"),
       eadVersion: attribute(ead, "version") || "EAD3",
     };
 
-    // This is a best-effort mapping. EAD control attributes
-    // do not always represent the language of the document.
     if (!metadata.titleProper) {
       errors.push({
         path: "/ead/control/filedesc/titlestmt/titleproper",
@@ -115,7 +150,8 @@ class EadMapper {
       "archdesc",
       "/ead/archdesc",
       errors,
-      warnings
+      warnings,
+      metadata.titleProper
     );
 
     if (!rootNode) {
@@ -125,17 +161,54 @@ class EadMapper {
       });
     }
 
-    return { metadata, rootNode };
+    return {
+      metadata,
+      rootNode,
+    };
   }
 
-  mapNode(source, elementName, path, errors, warnings) {
+  mapNode(
+    source,
+    elementName,
+    path,
+    errors,
+    warnings,
+    fallbackTitle = null
+  ) {
     const object = asObject(source);
     const did = child(object, "did");
 
-    const name = firstText(did.unittitle, object.unittitle);
-    const unitid = firstText(did.unitid, object.unitid);
+    const didNotes = mapDidNotes(did);
 
-    if (!name && !unitid) {
+    const structuralUnitDescription =
+      didNotes.find(
+        (note) =>
+          String(note.localtype || "").toLowerCase() ===
+          "structuralunitdescription"
+      )?.text ?? null;
+
+    const originalName = firstText(
+      did.unittitle,
+      object.unittitle
+    );
+
+    const unitidElements = asArray(did.unitid);
+
+    // Ignore unitid elements used for metadata such as modified
+    // and modifiedby; select the actual identifier.
+    const unitidElement = unitidElements.find(
+      (item) => !attribute(item, "localtype")
+    );
+
+    const unitid = firstText(
+      unitidElement,
+      object.unitid
+    );
+
+    const fallbackName =
+      elementName === "archdesc" ? fallbackTitle : null;
+
+    if (!originalName && !unitid && !fallbackName) {
       errors.push({
         path,
         message: "The node must have a title or unit identifier.",
@@ -144,29 +217,45 @@ class EadMapper {
       return null;
     }
 
-    if (!name && unitid) {
+    if (!originalName && fallbackName) {
       warnings.push({
         path,
-        message: "The node has no title; its unit identifier will be used.",
+        message:
+          "The archive description has no title; the EAD document title was used as a fallback.",
+      });
+    } else if (!originalName && unitid) {
+      warnings.push({
+        path,
+        message:
+          "The node has no title; its unit identifier will be used.",
       });
     }
 
     const node = {
-      nodeType: elementName === "archdesc" ? "ead_root" : "ead_component",
-      name: name || unitid,
+      nodeType:
+        elementName === "archdesc"
+          ? "ead_root"
+          : "ead_component",
+      name: originalName || fallbackName || unitid,
       unitid,
       eadId: attribute(object, "id"),
       level: attribute(object, "level"),
       otherlevel: attribute(object, "otherlevel"),
+      structuralUnitDescription,
+      didNotes,
       audience: attribute(object, "audience"),
       description: firstText(did.abstract, object.abstract),
-      scopeContent: textValue(object.scopecontent),
+      scopeContent: scopeContentValue(object.scopecontent),
       appraisal: textValue(object.appraisal),
       children: [],
     };
 
+    // archdesc components are contained in dsc.
+    // Nested c/c01-c12 elements are contained in the component itself.
     const componentContainer =
-      elementName === "archdesc" ? child(object, "dsc") : object;
+      elementName === "archdesc"
+        ? child(object, "dsc")
+        : object;
 
     for (const entry of componentEntries(componentContainer)) {
       const childNode = this.mapNode(

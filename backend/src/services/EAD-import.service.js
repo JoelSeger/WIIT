@@ -71,9 +71,11 @@ class EadImportService {
     let structureId = input.structureId;
 
     if (hasStructureName) {
-      structureId = await this.repository.findOrCreateStructure(
-        input.structureName.trim()
-      );
+      console.log("[EAD IMPORT] structureName:", JSON.stringify(input.structureName));
+  structureId = await this.repository.findOrCreateStructure(
+    input.structureName.trim(),
+    result.metadata
+    );
     }
 
     return this.repository.importDocument({

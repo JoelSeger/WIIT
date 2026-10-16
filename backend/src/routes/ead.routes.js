@@ -4,7 +4,7 @@ const multer = require("multer");
 const {
   previewImport,
   importEad,
-} = require("./ead.controller");
+} = require("../controllers/ead.controller");
 
 const router = express.Router();
 
@@ -27,5 +27,16 @@ const upload = multer({
 
 router.post("/import/preview", upload.single("file"), previewImport);
 router.post("/import", upload.single("file"), importEad);
+router.post("/test-upload", upload.single("file"), (req, res) => {
+  console.log("[UPLOAD TEST] Route reached");
+  console.log("[UPLOAD TEST] File exists:", Boolean(req.file));
+
+  return res.status(200).json({
+    message: "Upload route is working",
+    fileReceived: Boolean(req.file),
+    fileName: req.file?.originalname || null,
+    fileSize: req.file?.size || 0,
+  });
+});
 
 module.exports = router;

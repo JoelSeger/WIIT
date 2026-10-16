@@ -1,18 +1,19 @@
 const path = require("path");
 
-const { EadParser } = require("./ead.parser");
-const { EadMapper } = require("./ead.mapper");
-const { EadRepository } = require("./ead.repository");
+const db = require("../../db/knex")
+const { EadParser } = require("../ead/eadParser");
+const { EadMapper } = require("../ead/eadMapper");
+const { EadRepository } = require("../repositories/ead.repository");
 
 const {
   EadImportService,
   EadImportValidationError,
-} = require("./ead-import.service");
+} = require("../services/EAD-import.service");
 
 const eadService = new EadImportService(
   new EadParser(),
   new EadMapper(),
-  new EadRepository()
+  new EadRepository(db)
 );
 
 function getXmlFromRequest(req) {
@@ -25,24 +26,43 @@ function getXmlFromRequest(req) {
   return req.file.buffer.toString("utf8");
 }
 
+
 async function previewImport(req, res, next) {
+  console.log("[EAD PREVIEW] Request received");
+  console.log("[EAD PREVIEW] File exists:", Boolean(req.file));
+
   try {
     const xml = getXmlFromRequest(req);
+
+    console.log("[EAD PREVIEW] XML length:", xml.length);
+    console.log("[EAD PREVIEW] Starting parser and mapper");
+
     const result = eadService.preview(xml);
+
+    console.log("[EAD PREVIEW] Success");
 
     return res.status(200).json(result);
   } catch (error) {
-    if (error instanceof Error) {
+    console.error("[EAD PREVIEW] Error name:", error.name);
+    console.error("[EAD PREVIEW] Error message:", error.message);
+    console.error("[EAD PREVIEW] Error stack:", error.stack);
+
+    if (error.status === 400) {
       return res.status(400).json({
         message: error.message,
       });
     }
 
-    next(error);
+    return res.status(500).json({
+      message: error.message || "Unknown error",
+      errorName: error.name,
+    });
   }
 }
 
+
 async function importEad(req, res, next) {
+  console.log("--- تم استلام طلب الـ Import بنجاح في الـ Controller! ---");
   try {
     const xml = getXmlFromRequest(req);
 
@@ -50,12 +70,6 @@ async function importEad(req, res, next) {
 
     if (req.body.structureId !== undefined && req.body.structureId !== "") {
       structureId = Number(req.body.structureId);
-
-      if (!Number.isInteger(structureId) || structureId <= 0) {
-        return res.status(400).json({
-          message: "structureId must be a positive integer.",
-        });
-      }
     }
 
     const structureName =
@@ -63,16 +77,16 @@ async function importEad(req, res, next) {
         ? req.body.structureName.trim()
         : "";
 
-    if ((structureId !== null) === (structureName.length > 0)) {
+    if (!structureId && !structureName) {
       return res.status(400).json({
-        message: "Provide exactly one of structureId or structureName.",
+        message: "Provide either structureId or structureName.",
       });
     }
 
     const result = await eadService.import({
       xml,
       sourceFileName: path.basename(req.file.originalname),
-      structureId,
+      structureId: structureId || null,
       structureName: structureName || null,
     });
 
@@ -81,21 +95,23 @@ async function importEad(req, res, next) {
       ...result,
     });
   } catch (error) {
-    if (error instanceof EadImportValidationError) {
-      return res.status(422).json({
-        message: error.message,
-        errors: error.issues,
-      });
-    }
+  console.error("EAD import failed:", error.stack || error);
 
-    if (error && error.code === "STRUCTURE_NOT_FOUND") {
-      return res.status(404).json({
-        message: error.message,
-      });
-    }
-
-    next(error);
+  if (error instanceof EadImportValidationError) {
+    return res.status(400).json({
+      message: error.message,
+      errors: error.issues,
+    });
   }
+
+  if (error.status && error.status < 500) {
+    return res.status(error.status).json({
+      message: error.message,
+    });
+  }
+
+  return next(error);
+}
 }
 
 module.exports = {
