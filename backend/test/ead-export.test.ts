@@ -3,24 +3,26 @@
  *
  * Builds the WIIT tables in an in-memory SQLite database (same columns as the
  * MSSQL migrations 001–007, minus MSSQL-only details), runs the REAL demo seed
- * (db/seeds/01_demo.js) twice, then exports and checks the result.
+ * (seeds/01_demo.js) twice, then exports and checks the result.
  *
  *   npm i -D better-sqlite3
- *   node test/ead-export.test.js            (optional: EAD3_XSD=path/to/ead3.xsd to validate)
+ *   npx tsx test/ead-export.test.ts         (optional: EAD3_XSD=path/to/ead3.xsd to validate)
  */
 
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const { execFileSync } = require('node:child_process');
-const knexLib = require('knex');
-const { seed } = require('../seeds/01_demo');
-const { loadStructure } = require('../src/ead/loadStructure');
-const { buildEad3 } = require('../src/ead/buildEad3');
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import knexLib, { type Knex } from 'knex';
+import { loadStructure, type LoadedStructure, type LoadOptions } from '../src/ead/loadStructure';
+import { buildEad3 } from '../src/ead/buildEad3';
 
-async function createTables(knex) {
+// The seed is still JS – typed here until it is converted
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { seed } = require('../seeds/01_demo') as { seed: (knex: Knex) => Promise<void> };
 
-  const audit = (t) => {
+async function createTables(knex: Knex): Promise<void> {
+  const audit = (t: Knex.CreateTableBuilder): void => {
     t.datetime('created_at'); t.integer('created_by'); t.datetime('updated_at'); t.integer('updated_by');
   };
   await knex.schema.createTable('users', (t) => {
@@ -77,31 +79,46 @@ async function createTables(knex) {
   }
 }
 
-function validate(xml, name) {
+function validate(xml: string, name: string): void {
   const xsd = process.env.EAD3_XSD;
-  if (!xsd) return console.log(`  (skipped XSD validation for ${name} – set EAD3_XSD)`);
+  if (!xsd) {
+    console.log(`  (skipped XSD validation for ${name} – set EAD3_XSD)`);
+    return;
+  }
   const file = path.join(process.env.OUT_DIR || '.', name);
   fs.writeFileSync(file, xml);
   execFileSync('xmllint', ['--noout', '--schema', xsd, file], { stdio: 'inherit' });
 }
 
-const idOf = async (knex, code) => (await knex('structures').where({ code }).first('id')).id;
+async function idOf(knex: Knex, table: string, code: string): Promise<number> {
+  const row = await knex(table).where({ code }).first('id');
+  if (!row) throw new Error(`No ${table} row with code '${code}'`);
+  return row.id as number;
+}
+
+/** loadStructure must find the structure in these tests – fail loudly if it doesn't. */
+async function load(knex: Knex, id: number, opts?: LoadOptions): Promise<LoadedStructure> {
+  const loaded = await loadStructure(knex, id, opts);
+  assert.ok(loaded, `structure ${id} should load`);
+  return loaded;
+}
 
 (async () => {
   const knex = knexLib({ client: 'better-sqlite3', connection: { filename: ':memory:' }, useNullAsDefault: true });
   await createTables(knex);
   await seed(knex);
   await seed(knex);                                   // must be re-runnable (clears in the right order)
-  assert.equal((await knex('nodes').count({ n: '*' }).first()).n, 9, 'seed re-run gives the same data');
+  const count = await knex('nodes').count({ n: '*' }).first();
+  assert.equal(Number(count?.n), 9, 'seed re-run gives the same data');
   console.log('✓ seed runs twice');
 
   const fixed = { generatedAt: new Date('2026-10-11T12:00:00Z') };
-  const klass = await idOf(knex, 'klass-2021');
-  const forteckning = await idOf(knex, 'mau-001-forteckning');
-  const forv = await idOf(knex, 'forvaring');
+  const klass = await idOf(knex, 'structures', 'klass-2021');
+  const forteckning = await idOf(knex, 'structures', 'mau-001-forteckning');
+  const forv = await idOf(knex, 'structures', 'forvaring');
 
   // 1. Klassificering: archive + creator on top, version, previous beteckning
-  const klassXml = buildEad3(await loadStructure(knex, klass), fixed);
+  const klassXml = buildEad3(await load(knex, klass), fixed);
   assert.match(klassXml, /<edition>2021<\/edition>/);
   assert.match(klassXml, /<archdesc level="fonds">/);
   assert.match(klassXml, /<unitid>MAU-001<\/unitid>/);
@@ -115,7 +132,7 @@ const idOf = async (knex, code) => (await knex('structures').where({ code }).fir
   console.log('✓ klassificering: arkiv, arkivbildare, version, tidigare beteckning');
 
   // 2. Arkivförteckning, full
-  const fullXml = buildEad3(await loadStructure(knex, forteckning), fixed);
+  const fullXml = buildEad3(await load(knex, forteckning), fixed);
   assert.match(fullXml, /<c level="series"/);
   assert.match(fullXml, /<c level="file"/);
   assert.match(fullXml, /<physloc localtype="forvaras_i">Förvaring MAU: A-3-12 Kartong 12<\/physloc>/);
@@ -126,7 +143,7 @@ const idOf = async (knex, code) => (await knex('structures').where({ code }).fir
   console.log('✓ arkivförteckning: förvaras i + redovisas under, sekretess i full export');
 
   // 3. Arkivförteckning, public
-  const pubXml = buildEad3(await loadStructure(knex, forteckning, { publicOnly: true }), { ...fixed, publicOnly: true });
+  const pubXml = buildEad3(await load(knex, forteckning, { publicOnly: true }), { ...fixed, publicOnly: true });
   assert.doesNotMatch(pubXml, /sekretess/, 'is_public = 0 field hidden');
   assert.doesNotMatch(pubXml, /physloc/, 'storage in unpublished Förvaring hidden');
   assert.match(pubXml, /redovisas_under/, 'link to a published classification is shown');
@@ -136,26 +153,27 @@ const idOf = async (knex, code) => (await knex('structures').where({ code }).fir
 
   // 4. Unpublished creator → no <origination> publicly, but still in the full export
   await knex('archive_creators').where({ name: 'Malmö universitet' }).update({ is_published: false });
-  const hidden = buildEad3(await loadStructure(knex, forteckning, { publicOnly: true }), { ...fixed, publicOnly: true });
+  const hidden = buildEad3(await load(knex, forteckning, { publicOnly: true }), { ...fixed, publicOnly: true });
   assert.doesNotMatch(hidden, /origination/);
-  assert.match(buildEad3(await loadStructure(knex, forteckning), fixed), /origination/);
+  assert.match(buildEad3(await load(knex, forteckning), fixed), /origination/);
   validate(hidden, 'forteckning-public-nocreator.ead3.xml');
   console.log('✓ unpublished arkivbildare hidden publicly');
 
   // 5. Förvaring: unpublished → not public; full export has both top nodes under the archive
   assert.equal(await loadStructure(knex, forv, { publicOnly: true }), null);
-  const forvXml = buildEad3(await loadStructure(knex, forv), fixed);
+  const forvXml = buildEad3(await load(knex, forv), fixed);
   assert.match(forvXml, /<c level="otherlevel" otherlevel="kartong"/);
   assert.ok(forvXml.indexOf('Arkivlokal A') < forvXml.indexOf('Arkivlokal B'), 'sort_order respected');
   validate(forvXml, 'forvaring-full.ead3.xml');
   console.log('✓ förvaring: not public, full export ok');
 
   // 6. Structure with no archive link → falls back to the old behaviour
-  const [{ id: loose }] = await knex('structures').insert(
+  const [inserted] = await knex('structures').insert(
     { code: 'los', name: 'Lös struktur', structure_type: 'klassificering', is_published: true }, ['id']);
-  const typeId = (await knex('node_types').where({ code: 'verksamhetsomrade' }).first('id')).id;
+  const loose = (inserted as { id: number }).id;
+  const typeId = await idOf(knex, 'node_types', 'verksamhetsomrade');
   await knex('nodes').insert({ structure_id: loose, node_type_id: typeId, title: 'Ensam rot', is_published: true });
-  const looseXml = buildEad3(await loadStructure(knex, loose), fixed);
+  const looseXml = buildEad3(await load(knex, loose), fixed);
   assert.match(looseXml, /<archdesc level="class">/);
   assert.doesNotMatch(looseXml, /origination/);
   validate(looseXml, 'los.ead3.xml');
@@ -163,4 +181,4 @@ const idOf = async (knex, code) => (await knex('structures').where({ code }).fir
 
   await knex.destroy();
   console.log('All EAD3 export tests passed');
-})().catch((e) => { console.error(e); process.exit(1); });
+})().catch((e: unknown) => { console.error(e); process.exit(1); });
