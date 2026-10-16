@@ -1,5 +1,5 @@
 /**
- * Turns a loaded structure (see loadStructure.js) into an EAD3 XML string.
+ * Turns a loaded structure (see loadStructure.ts) into an EAD3 XML string.
  * Pure function: no database, no I/O – that is what makes it easy to test.
  *
  * Mapping WIIT → EAD3
@@ -31,10 +31,14 @@
  * elements back to the right property or relation type (round trip).
  */
 
-const { el, render, isNcName } = require('./xml');
-const { toIsoDate } = require('./loadStructure');
+import { el, render, isNcName, type Attrs, type XmlChild, type XmlElement } from './xml';
+import {
+  toIsoDate,
+  type ArchiveCreator, type DbDate, type LoadedStructure, type NodeRelation,
+  type NodeType, type StructureRow, type TreeNode,
+} from './loadStructure';
 
-const EAD3_NS = 'http://ead3.archivists.org/schema/';
+export const EAD3_NS = 'http://ead3.archivists.org/schema/';
 
 // did children we allow from 'did/<x>' (simple text content in EAD3)
 const DID_TEXT = new Set(['unitdate', 'abstract', 'physdesc', 'materialspec', 'physloc', 'unitid']);
@@ -47,12 +51,22 @@ const BLOCKS = new Set([
   'phystech', 'prefercite', 'fileplan', 'odd',
 ]);
 
-function buildEad3(loaded, { generatedAt = new Date(), publicOnly = false, generator = 'WIIT' } = {}) {
+export interface BuildOptions {
+  /** Timestamp written to <maintenanceevent>. Fixed in tests so output is stable. */
+  generatedAt?: Date;
+  publicOnly?: boolean;
+  generator?: string;
+}
+
+export function buildEad3(
+  loaded: LoadedStructure,
+  { generatedAt = new Date(), publicOnly = false, generator = 'WIIT' }: BuildOptions = {},
+): string {
   const { structure, roots } = loaded;
 
   const control = buildControl(structure, generatedAt, generator, publicOnly);
 
-  let archdesc;
+  let archdesc: XmlElement;
   if (loaded.archive) {
     // The structure belongs to an archive: the archive is the fonds, all top nodes go below it
     const a = loaded.archive;
@@ -69,7 +83,7 @@ function buildEad3(loaded, { generatedAt = new Date(), publicOnly = false, gener
     ]);
   } else if (roots.length === 1) {
     // The single top node *is* the archival unit
-    const root = roots[0];
+    const root = roots[0]!;
     archdesc = el('archdesc', levelAttrs(root.type), [
       buildDid(root),
       ...buildBlocks(root),
@@ -94,7 +108,7 @@ function buildEad3(loaded, { generatedAt = new Date(), publicOnly = false, gener
 
 // ─── control ────────────────────────────────────────────────────────────────
 
-function buildControl(structure, generatedAt, generator, publicOnly) {
+function buildControl(structure: StructureRow, generatedAt: Date, generator: string, publicOnly: boolean): XmlElement {
   const agencyName = structure.agency_name || 'Malmö universitet';
   const lang = structure.language_code || 'swe';
   return el('control', {}, [
@@ -132,7 +146,7 @@ function buildControl(structure, generatedAt, generator, publicOnly) {
 
 // ─── components ─────────────────────────────────────────────────────────────
 
-function buildC(node) {
+function buildC(node: TreeNode): XmlElement {
   return el('c', { ...levelAttrs(node.type), id: nodeId(node) }, [
     buildDid(node),
     ...buildBlocks(node),
@@ -140,30 +154,30 @@ function buildC(node) {
   ]);
 }
 
-function levelAttrs(type) {
+function levelAttrs(type: NodeType): Attrs {
   return type.ead_level === 'otherlevel'
     ? { level: 'otherlevel', otherlevel: type.ead_otherlevel || type.code }
     : { level: type.ead_level };
 }
 
-function nodeId(node) {
+function nodeId(node: TreeNode): string {
   return isNcName(node.external_id) ? node.external_id : `wiit-node-${node.id}`;
 }
 
-function buildDid(node) {
+function buildDid(node: TreeNode): XmlElement {
   const props = node.properties;
   const hasDateProp = props.some((p) => p.ead_element === 'did/unitdate');
 
-  const fromProps = props
+  const fromProps: XmlChild[] = props
     .filter((p) => p.ead_element && p.ead_element.startsWith('did/'))
     .map((p) => {
-      const tag = p.ead_element.slice(4);
+      const tag = p.ead_element!.slice(4);
       if (!DID_TEXT.has(tag)) return null;
       // EAD3 quirk: <unitdate> is the only did child without @localtype – import maps it by element name
       return el(tag, { localtype: tag === 'unitdate' ? null : p.key, label: p.label }, p.value);
     });
 
-  const daos = [
+  const daos: XmlChild[] = [
     node.portal_url && el('dao', { daotype: 'unknown', href: node.portal_url, linktitle: 'Visa i MAU Arkiv' }),
     ...props.filter((p) => p.ead_element === 'dao')
       .map((p) => el('dao', { daotype: 'unknown', href: p.value, linktitle: p.label, localtype: p.key })),
@@ -184,8 +198,8 @@ function buildDid(node) {
   ]);
 }
 
-function buildBlocks(node) {
-  const out = [];
+function buildBlocks(node: TreeNode): XmlElement[] {
+  const out: XmlElement[] = [];
   if (node.description) out.push(block('scopecontent', null, null, node.description));
 
   for (const p of node.properties) {
@@ -205,7 +219,7 @@ function buildBlocks(node) {
 }
 
 /** <tag localtype><head>label</head><p>para</p>…</tag> – blank lines split paragraphs. */
-function block(tag, localtype, head, text) {
+function block(tag: string, localtype: string | null, head: string | null, text: string): XmlElement {
   const paras = String(text).split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
   return el(tag, { localtype }, [
     head && el('head', {}, head),
@@ -213,27 +227,33 @@ function block(tag, localtype, head, text) {
   ]);
 }
 
-function describeTarget(r) {
+function describeTarget(r: NodeRelation): string {
   const t = r.target;
   const ref = t.reference_code ? `${t.reference_code} ` : '';
   return `${t.structure_name}: ${ref}${t.title}`;
 }
 
+const CREATOR_TAG: Record<ArchiveCreator['type'], string> = {
+  corporate: 'corpname',
+  person: 'persname',
+  family: 'famname',
+};
+
 /** Arkivbildare → <origination><corpname|persname|famname><part>name</part></…></origination> */
-function buildOrigination(creator) {
-  const tag = { person: 'persname', family: 'famname' }[creator.type] || 'corpname';
+function buildOrigination(creator: ArchiveCreator): XmlElement {
+  const tag = CREATOR_TAG[creator.type] || 'corpname';
   return el('origination', { label: 'Arkivbildare' }, [
     el(tag, {}, [el('part', {}, creator.name)]),
   ]);
 }
 
 /** Whole years (archives, creators) → <unitdatestructured> with standarddate="YYYY". */
-function yearRange(from, to) {
-  const y = (v) => (v == null ? null : String(v).padStart(4, '0'));
+function yearRange(from: number | null, to: number | null): XmlElement | null {
+  const y = (v: number | null): string | null => (v == null ? null : String(v).padStart(4, '0'));
   return dateRange(y(from), y(to));
 }
 
-function dateRange(from, to) {
+function dateRange(from: DbDate, to: DbDate): XmlElement | null {
   const f = toIsoDate(from);
   const t = toIsoDate(to);
   if (!f && !t) return null;
@@ -244,5 +264,3 @@ function dateRange(from, to) {
     ]),
   ]);
 }
-
-module.exports = { buildEad3, EAD3_NS };
