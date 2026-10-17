@@ -1,3 +1,37 @@
+const norm = (value) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // å ä ö -> a a o, robust for composed/decomposed forms
+    .trim()
+    .toLowerCase();
+
+// structuralunit nodes are told apart by <didnote localtype="structuralunitdescription">
+const CLASSIFICATION_TYPES = {
+  verksamhetsomrade: { code: "verksamhetsomrade", name: "Verksamhetsområde" },
+  processgrupp: { code: "processgrupp", name: "Processgrupp" },
+  process: { code: "process", name: "Process" },
+};
+
+const EAD_LEVELS = new Set([
+  "collection", "fonds", "class", "recordgrp", "series", "subfonds",
+  "subgrp", "subseries", "file", "item", "otherlevel",
+]);
+
+const KNOWN_OTHERLEVEL_NAMES = {
+  recordgroup: "Record group (EAD)",
+  recordtype: "Record type (EAD)",
+};
+
+const STRUCTURE_TYPE = "klassificering";
+
+// Rare EAD elements are stored as custom fields (custom_field_definitions +
+// classification_node_custom_values) instead of dedicated columns.
+const CUSTOM_FIELDS = {
+  physloc: { fieldName: "physloc", displayName: "Physical location (physloc)", dataType: "text" },
+  legalstatus: { fieldName: "legalstatus", displayName: "Legal status (legalstatus)", dataType: "text" },
+  relation: { fieldName: "relation", displayName: "Related link (relation)", dataType: "json" },
+  unitid: { fieldName: "extra_unitid", displayName: "Additional identifier (unitid)", dataType: "text" },
+};
 
 class EadRepository {
   constructor(knex) {
@@ -5,170 +39,88 @@ class EadRepository {
   }
 
   /**
-   * Determine the application node type from the EAD element.
+   * Decide the application node type from the EAD attributes + didnote.
+   * Returns what is needed both to look up and to create the node_types row.
    */
   getNodeTypeInfo(node) {
-    const normalize = (value) =>
-      String(value || "")
-        .trim()
-        .toLowerCase();
-
-    const otherlevel = normalize(node.otherlevel);
-    const level = normalize(node.level);
+    const otherlevel = norm(node.otherlevel);
+    const level = norm(node.level);
 
     if (otherlevel === "structuralunit") {
-      const description = normalize(
-        node.structuralUnitDescription
-      )
-        .replace(/å/g, "a")
-        .replace(/ä/g, "a")
-        .replace(/ö/g, "o");
+      const known = CLASSIFICATION_TYPES[norm(node.structuralUnitDescription)];
 
-      const classificationTypes = {
-        verksamhetsomrade: {
-          code: "verksamhetsomrade",
-          name: "Verksamhetsområde",
-        },
-        processgrupp: {
-          code: "processgrupp",
-          name: "Processgrupp",
-        },
-        process: {
-          code: "process",
-          name: "Process",
-        },
+      if (known) {
+        return { ...known, eadLevel: "otherlevel", eadOtherlevel: "structuralunit", known: true };
+      }
+
+      return {
+        code: "structuralunit",
+        name: "Structural unit (EAD)",
+        eadLevel: "otherlevel",
+        eadOtherlevel: "structuralunit",
+        known: false,
       };
-
-      return (
-        classificationTypes[description] || {
-          code: "structuralunit",
-          name: "Structural unit (EAD)",
-        }
-      );
     }
 
-    const eadType = otherlevel || level;
+    const code = otherlevel || level;
 
-    if (!eadType || eadType === "otherlevel") {
-      throw new Error(
-        `Cannot determine EAD node type for "${node.name}".`
-      );
+    if (!code || code === "otherlevel") {
+      throw new Error(`Cannot determine EAD node type for "${node.name}".`);
     }
 
-    const knownTypes = {
-      recordgroup: "Record group (EAD)",
-      recordtype: "Record type (EAD)",
-    };
+    // A real EAD level (file, series ...) without @otherlevel
+    if (!otherlevel && EAD_LEVELS.has(level) && level !== "otherlevel") {
+      return { code, name: `${code} (EAD)`, eadLevel: level, eadOtherlevel: null, known: true };
+    }
 
     return {
-      code: eadType,
-      name: knownTypes[eadType] || `${eadType} (EAD)`,
+      code,
+      name: KNOWN_OTHERLEVEL_NAMES[code] || `${node.otherlevel || node.level} (EAD)`,
+      eadLevel: "otherlevel",
+      eadOtherlevel: node.otherlevel || node.level,
+      known: true,
     };
   }
 
-  /**
-   * Find an existing classification structure or create it.
-   * The db argument allows the caller to reuse its transaction.
-   */
-  async findOrCreateStructure(
-    name,
-    metadata = {},
-    db = this.knex
-  ) {
+  async findOrCreateStructure(name, metadata = {}, db = this.knex, extra = {}) {
     const structureName = String(name || "").trim();
-
-    if (!structureName) {
-      throw new Error("A structure name is required.");
-    }
+    if (!structureName) throw new Error("A structure name is required.");
 
     const existing = await db("structures")
-      .where({
-        name: structureName,
-        structure_type: "klassificering",
-      })
+      .where({ name: structureName, structure_type: STRUCTURE_TYPE })
       .first();
-
-    if (existing) {
-      return existing.id;
-    }
+    if (existing) return existing.id;
 
     const code =
-      "EAD-" +
-      Date.now().toString(36).toUpperCase() +
-      "-" +
+      "EAD-" + Date.now().toString(36).toUpperCase() + "-" +
       Math.random().toString(36).slice(2, 7).toUpperCase();
 
     const inserted = await db("structures").insert(
       {
         code,
         name: structureName,
-        structure_type: "klassificering",
+        structure_type: STRUCTURE_TYPE,
         agency_name: metadata.agencyName || "Unknown",
-        language_code: metadata.languageCode || "swe",
+        language_code: (metadata.languageCode || "swe").slice(0, 3),
+        version: extra.version || metadata.edition || null,
+        description: extra.description || null,
+        valid_from: extra.validFrom || null,
       },
       ["id"]
     );
-
     return inserted[0].id;
   }
 
   /**
-   * Ensure the standard classification node types exist.
-   */
-  async ensureClassificationNodeTypes(trx) {
-    const definitions = [
-      {
-        code: "verksamhetsomrade",
-        name: "Verksamhetsområde",
-      },
-      {
-        code: "processgrupp",
-        name: "Processgrupp",
-      },
-      {
-        code: "process",
-        name: "Process",
-      },
-    ];
-
-    const typeIds = {};
-
-    for (const definition of definitions) {
-      let row = await trx("node_types")
-        .where({
-          code: definition.code,
-          structure_type: "klassificering",
-        })
-        .first();
-
-      if (!row) {
-        const inserted = await trx("node_types").insert(
-          {
-            code: definition.code,
-            name: definition.name,
-            structure_type: "klassificering",
-            ead_level: "class",
-            ead_otherlevel: null,
-            description: null,
-            is_active: true,
-          },
-          ["id"]
-        );
-
-        row = { id: inserted[0].id };
-      }
-
-      typeIds[definition.code] = row.id;
-    }
-
-    return typeIds;
-  }
-
-  /**
-   * Import one EAD document and its tree.
+   * Import one EAD document.
    *
-   * The archdesc wrapper is not inserted as a node.
-   * Its children are inserted as top-level nodes.
+   * <archdesc> is not a node. Under <dsc> this export has two branches:
+   *   - otherlevel="classificationstructure"  -> THE structure (its children are
+   *     the top nodes: Verksamhetsområde ...). Its own data (title, version,
+   *     scopecontent) goes on the structures row, not into nodes.
+   *   - otherlevel="recordkeepingentity"      -> storage / system tree
+   *     (Strukturenhet, Verksamhetssystem, Svit ...). NOT a classification tree;
+   *     skipped here and reported, so it does not pollute the klassificering tree.
    */
   async importDocument({
     structureId,
@@ -177,15 +129,20 @@ class EadRepository {
     rootNode,
     sourceFileName = null,
   }) {
-    if (!rootNode) {
-      throw new Error("The EAD document has no root node.");
+    if (!rootNode) throw new Error("The EAD document has no root node.");
+    if (!structureId && !structureName) {
+      throw new Error("Either structureId or structureName is required.");
     }
 
-    if (!structureId && !structureName) {
-      throw new Error(
-        "Either structureId or structureName is required."
-      );
-    }
+    const branches = rootNode.children || [];
+    const wrapper = branches.find((n) => norm(n.otherlevel) === "classificationstructure");
+    const isStorage = (n) => norm(n.otherlevel) === "recordkeepingentity";
+    const topNodes = wrapper ? wrapper.children || [] : branches.filter((n) => !isStorage(n));
+    const skippedBranches = branches
+      .filter((n) => n !== wrapper && isStorage(n))
+      .map((n) => ({ name: n.name, otherlevel: n.otherlevel, eadId: n.eadId }));
+
+    const warnings = [];
 
     return this.knex.transaction(async (trx) => {
       let targetStructureId = structureId;
@@ -194,137 +151,128 @@ class EadRepository {
         targetStructureId = await this.findOrCreateStructure(
           structureName,
           metadata,
-          trx
+          trx,
+          {
+            version: wrapper?.unitidLabel,
+            description: wrapper?.scopeContent,
+            validFrom: wrapper?.validFrom,
+          }
         );
       }
 
       const structure = await trx("structures")
-        .where({
-          id: targetStructureId,
-          structure_type: "klassificering",
-        })
+        .where({ id: targetStructureId, structure_type: STRUCTURE_TYPE })
         .first();
-
       if (!structure) {
-        throw new Error(
-          "The selected classification structure does not exist."
-        );
+        throw new Error("The selected classification structure does not exist.");
       }
 
-      // Ensure standard types, then cache all classification types.
-      await this.ensureClassificationNodeTypes(trx);
-
-      const existingTypes = await trx("node_types")
-        .where({
-          structure_type: "klassificering",
-        })
-        .select("id", "code");
-
-      const nodeTypeCache = new Map(
-        existingTypes.map((type) => [
-          type.code,
-          type.id,
-        ])
+      // node_types.code is UNIQUE across all structure types, so cache by code only.
+      const typeCache = new Map(
+        (await trx("node_types").select("id", "code", "structure_type")).map((t) => [t.code, t])
       );
 
-      // Read existing reference codes once.
-      // This is necessary because the database has a unique index
-      // on (structure_id, reference_code).
-      const existingCodes = await trx("nodes")
-        .where({
-          structure_id: targetStructureId,
-        })
-        .whereNotNull("reference_code")
-        .select("reference_code");
+      const resolveType = async (info) => {
+        const cached = typeCache.get(info.code);
+        if (cached) {
+          if (cached.structure_type !== STRUCTURE_TYPE) {
+            throw new Error(
+              `Node type "${info.code}" already exists for structure type "${cached.structure_type}".`
+            );
+          }
+          return cached.id;
+        }
+        const inserted = await trx("node_types").insert(
+          {
+            code: info.code,
+            name: info.name,
+            structure_type: STRUCTURE_TYPE,
+            ead_level: info.eadLevel,
+            ead_otherlevel: info.eadOtherlevel,
+            description: null,
+            is_active: true,
+          },
+          ["id"]
+        );
+        typeCache.set(info.code, { id: inserted[0].id, code: info.code, structure_type: STRUCTURE_TYPE });
+        return inserted[0].id;
+      };
+
+      // the three standard types always exist, even if the file lacks one of them
+      for (const def of Object.values(CLASSIFICATION_TYPES)) {
+        await resolveType({ ...def, eadLevel: "otherlevel", eadOtherlevel: "structuralunit" });
+      }
 
       const usedReferenceCodes = new Set(
-        existingCodes.map((row) =>
-          String(row.reference_code).trim()
-        )
+        (await trx("nodes")
+          .where({ structure_id: targetStructureId })
+          .whereNotNull("reference_code")
+          .select("reference_code")
+        ).map((r) => String(r.reference_code).trim())
       );
 
       const documentRows = await trx("ead_documents").insert(
         {
           structure_id: targetStructureId,
           record_id: metadata.recordId || null,
-          title_proper:
-            metadata.titleProper || rootNode.name || null,
+          title_proper: metadata.titleProper || rootNode.name || null,
           edition: metadata.edition || null,
           agency_name: metadata.agencyName || null,
           country_code: metadata.countryCode || null,
           language_code: metadata.languageCode || null,
           script_code: metadata.scriptCode || null,
-          publication_status:
-            metadata.publicationStatus || null,
+          publication_status: metadata.publicationStatus || null,
           source_file_name: sourceFileName,
         },
         ["id"]
       );
-
       const documentId = documentRows[0].id;
+
+      const propertyRows = [];
+      const refRows = [];
+      const eadIdToNodeId = new Map();
       let importedNodeCount = 0;
+      let duplicateReferenceCodes = 0;
 
-      const getUniqueReferenceCode = (value) => {
-        const code =
-          value == null ? "" : String(value).trim();
+      const insertNode = async (node, parentId, siblingIndex) => {
+        if (!node || !node.name) throw new Error("A classification node is missing its name.");
 
-        if (!code || usedReferenceCodes.has(code)) {
-          return null;
+        const info = this.getNodeTypeInfo(node);
+        if (!info.known) {
+          warnings.push({
+            message: `"${node.name}": unknown structuralunitdescription "${node.structuralUnitDescription}"; stored as generic structural unit.`,
+          });
         }
+        const nodeTypeId = await resolveType(info);
 
-        usedReferenceCodes.add(code);
-        return code;
-      };
-
-      const getNodeTypeId = async (node) => {
-        const typeInfo = this.getNodeTypeInfo(node);
-
-        if (nodeTypeCache.has(typeInfo.code)) {
-          return nodeTypeCache.get(typeInfo.code);
+        // unit_id keeps the original <unitid> always. reference_code has a unique
+        // index per structure, and ids like "HS" / "HT1" repeat, so it is only set
+        // when unique.
+        let referenceCode = node.unitid ? String(node.unitid).trim() : null;
+        if (referenceCode) {
+          if (usedReferenceCodes.has(referenceCode)) {
+            referenceCode = null;
+            duplicateReferenceCodes += 1;
+          } else {
+            usedReferenceCodes.add(referenceCode);
+          }
         }
-
-        const inserted = await trx("node_types").insert(
-          {
-            code: typeInfo.code,
-            name: typeInfo.name,
-            structure_type: "klassificering",
-            ead_level: node.level || null,
-            ead_otherlevel: node.otherlevel || null,
-            description: null,
-            is_active: true,
-          },
-          ["id"]
-        );
-
-        const id = inserted[0].id;
-        nodeTypeCache.set(typeInfo.code, id);
-
-        return id;
-      };
-
-      const insertNode = async (node, parentId) => {
-        if (!node || !node.name) {
-          throw new Error(
-            "A classification node is missing its name."
-          );
-        }
-
-        const nodeTypeId = await getNodeTypeId(node);
 
         const insertedRows = await trx("nodes").insert(
           {
             structure_id: targetStructureId,
             parent_id: parentId,
             node_type_id: nodeTypeId,
-            reference_code: getUniqueReferenceCode(node.unitid),
+            reference_code: referenceCode,
+            unit_id: node.unitid || null,
+            unit_id_label: node.unitidLabel || null,
+            structural_unit_description: node.structuralUnitDescription || null,
+            access_restrict: node.accessRestrict || null,
             title: node.name,
-            sort_order: importedNodeCount,
+            sort_order: siblingIndex,
             is_published: false,
             external_id: null,
-            description:
-              node.description ||
-              node.structuralUnitDescription ||
-              null,
+            description: node.description || null, // only <abstract>; the type is NOT a description
             previous_reference_code: null,
             ead_document_id: documentId,
             ead_id: node.eadId || null,
@@ -332,28 +280,152 @@ class EadRepository {
             appraisal: node.appraisal || null,
             ead_audience: node.audience || null,
             local_type: node.otherlevel || node.level || null,
+            modified_at: node.modifiedAt || null,
+            modified_by: node.modifiedBy || null,
+            valid_from: node.validFrom || null,
+            valid_to: node.validTo || null,
           },
           ["id"]
         );
 
-        const insertedNodeId = insertedRows[0].id;
+        const nodeId = insertedRows[0].id;
         importedNodeCount += 1;
+        if (node.eadId) eadIdToNodeId.set(node.eadId, nodeId);
 
+        for (const p of node.properties || []) {
+          const field = CUSTOM_FIELDS[p.element];
+          if (!field || !p.value) continue;
+
+          propertyRows.push({
+            nodeId,
+            field,
+            value:
+              field.dataType === "json"
+                ? JSON.stringify({ href: p.value, title: p.label, type: p.localtype })
+                : p.value,
+          });
+        }
+        for (const r of node.refs || []) {
+          refRows.push({
+            node_id: nodeId, target_ead_id: r.targetEadId, label: r.label,
+            link_role: r.linkRole, target_node_id: null,
+          });
+        }
+
+        let index = 0;
         for (const childNode of node.children || []) {
-          await insertNode(childNode, insertedNodeId);
+          await insertNode(childNode, nodeId, index++);
         }
       };
 
-      for (const node of rootNode.children || []) {
-        await insertNode(node, null);
+      let top = 0;
+      for (const node of topNodes) {
+        await insertNode(node, null, top++);
+      }
+
+      // links to nodes that exist in this import can be resolved right away;
+      // the rest (e.g. the skipped storage tree) keep target_ead_id for later.
+      for (const r of refRows) {
+        r.target_node_id = eadIdToNodeId.get(r.target_ead_id) || null;
+      }
+
+      const batch = (table, rows) =>
+        rows.length ? this.knex.batchInsert(table, rows, 100).transacting(trx) : Promise.resolve();
+
+      // custom field definitions: reuse the structure's, create what is missing
+      const definitionIds = new Map(
+        (await trx("custom_field_definitions")
+          .where({ structure_id: targetStructureId })
+          .select("id", "field_name")
+        ).map((d) => [d.field_name, d.id])
+      );
+
+      for (const { field } of propertyRows) {
+        if (definitionIds.has(field.fieldName)) continue;
+        const inserted = await trx("custom_field_definitions").insert(
+          {
+            structure_id: targetStructureId,
+            field_name: field.fieldName,
+            display_name: field.displayName,
+            data_type: field.dataType,
+            is_required: false,
+          },
+          ["id"]
+        );
+        definitionIds.set(field.fieldName, inserted[0].id);
+      }
+
+      await batch(
+        "classification_node_custom_values",
+        propertyRows.map((r) => ({
+          node_id: r.nodeId,
+          custom_field_definition_id: definitionIds.get(r.field.fieldName),
+          value: r.value,
+        }))
+      );
+      await batch("node_ead_refs", refRows);
+
+      if (duplicateReferenceCodes) {
+        warnings.push({
+          message: `${duplicateReferenceCodes} repeated unitid values were not used as reference_code (unique index); they are kept in nodes.unit_id.`,
+        });
+      }
+      if (skippedBranches.length) {
+        warnings.push({
+          message: `Skipped ${skippedBranches.length} non-classification branch(es): ${skippedBranches.map((b) => b.otherlevel).join(", ")}.`,
+        });
       }
 
       return {
         structureId: targetStructureId,
         documentId,
         importedNodeCount,
+        skippedBranches,
+        warnings,
       };
     });
+  }
+
+  /**
+   * Rebuild the tree of a structure from the saved rows.
+   */
+  async getTree(structureId) {
+    const rows = await this.knex("nodes as n")
+      .join("node_types as t", "t.id", "n.node_type_id")
+      .where("n.structure_id", structureId)
+      .select(
+        "n.id", "n.parent_id", "n.sort_order", "n.title", "n.unit_id", "n.unit_id_label",
+        "n.reference_code", "n.ead_id", "n.local_type", "n.structural_unit_description",
+        "n.scope_content", "n.appraisal", "n.access_restrict", "n.description",
+        "n.modified_at", "n.modified_by", "n.ead_audience", "n.valid_from", "n.valid_to",
+        "t.code as type_code", "t.name as type_name", "t.ead_level", "t.ead_otherlevel"
+      )
+      .orderBy([{ column: "n.parent_id" }, { column: "n.sort_order" }]);
+
+    const customValues = await this.knex("classification_node_custom_values as v")
+      .join("custom_field_definitions as d", "d.id", "v.custom_field_definition_id")
+      .join("nodes as n", "n.id", "v.node_id")
+      .where("n.structure_id", structureId)
+      .select("v.node_id", "d.field_name", "v.value");
+
+    const valuesByNode = new Map();
+    for (const v of customValues) {
+      if (!valuesByNode.has(v.node_id)) valuesByNode.set(v.node_id, []);
+      valuesByNode.get(v.node_id).push({ field: v.field_name, value: v.value });
+    }
+
+    const byId = new Map(
+      rows.map((r) => [
+        r.id,
+        { ...r, customValues: valuesByNode.get(r.id) || [], children: [] },
+      ])
+    );
+    const roots = [];
+    for (const node of byId.values()) {
+      const parent = node.parent_id == null ? null : byId.get(node.parent_id);
+      (parent ? parent.children : roots).push(node);
+    }
+    return roots;
   }
 }
 

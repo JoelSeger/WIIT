@@ -46,8 +46,26 @@ function collectText(value) {
   return "";
 }
 
+// The parser runs with processEntities:false (safety), so XML entities
+// such as &amp; and &#246; arrive undecoded. Decode them here, once.
+function decodeXmlEntities(text) {
+  return text
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) =>
+      String.fromCodePoint(parseInt(hex, 16))
+    )
+    .replace(/&#(\d+);/g, (_, dec) =>
+      String.fromCodePoint(parseInt(dec, 10))
+    )
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&"); // must be last
+}
+
 function textValue(value) {
-  return collectText(value) || null;
+  const text = collectText(value);
+  return text ? decodeXmlEntities(text) || null : null;
 }
 
 function scopeContentValue(value) {
@@ -55,12 +73,24 @@ function scopeContentValue(value) {
 
   if (!text) return null;
 
+  // <br/> is stored escaped (&lt;br/&gt;) inside <p>; turn it into a newline
+  // BEFORE decoding the remaining entities.
   return (
-    text
-      .replace(/&lt;br\s*\/?&gt;/gi, "\n")
-      .replace(/\r\n/g, "\n")
-      .trim() || null
+    decodeXmlEntities(
+      text.replace(/&lt;br\s*\/?&gt;/gi, "\n").replace(/\r\n/g, "\n")
+    ).trim() || null
   );
+}
+
+function parseDateTime(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function isoDateOnly(value) {
+  const text = textValue(value);
+  return text && /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
 }
 
 function attribute(object, name) {
@@ -187,23 +217,49 @@ class EadMapper {
           "structuralunitdescription"
       )?.text ?? null;
 
-    const originalName = firstText(
-      did.unittitle,
-      object.unittitle
-    );
+    const originalName = firstText(did.unittitle, object.unittitle);
 
-    const unitidElements = asArray(did.unitid);
+    // ---- <unitid> elements -------------------------------------------
+    // One <did> carries several unitid elements:
+    //   (no localtype)        the real identifier        -> unitid
+    //   localtype="modified"   last-modified timestamp    -> modifiedAt
+    //   localtype="modifiedby" last-modified user         -> modifiedBy
+    //   localtype="relations"  <ref target="..."> links   -> refs
+    let unitid = null;
+    let unitidLabel = null;
+    let modifiedAt = null;
+    let modifiedBy = null;
+    const properties = [];
+    const refs = [];
 
-    // Ignore unitid elements used for metadata such as modified
-    // and modifiedby; select the actual identifier.
-    const unitidElement = unitidElements.find(
-      (item) => !attribute(item, "localtype")
-    );
+    for (const item of asArray(did.unitid)) {
+      const localtype = (attribute(item, "localtype") || "").toLowerCase();
 
-    const unitid = firstText(
-      unitidElement,
-      object.unitid
-    );
+      if (localtype === "modified") {
+        modifiedAt = parseDateTime(textValue(item));
+      } else if (localtype === "modifiedby") {
+        modifiedBy = textValue(item);
+      } else if (localtype === "relations") {
+        for (const ref of asArray(asObject(item).ref)) {
+          refs.push({
+            targetEadId: attribute(ref, "target"),
+            label: textValue(ref),
+            linkRole: attribute(ref, "linkrole"),
+          });
+        }
+      } else if (!unitid) {
+        unitid = textValue(item);
+        unitidLabel = attribute(item, "label");
+      } else {
+        // an unexpected extra identifier: keep it rather than lose it
+        properties.push({
+          element: "unitid",
+          localtype: localtype || null,
+          label: attribute(item, "label"),
+          value: textValue(item),
+        });
+      }
+    }
 
     const fallbackName =
       elementName === "archdesc" ? fallbackTitle : null;
@@ -231,6 +287,51 @@ class EadMapper {
       });
     }
 
+    // ---- dates -----------------------------------------------------
+    const dateRange = child(child(did, "unitdatestructured"), "daterange");
+    const validFrom = isoDateOnly(dateRange.fromdate);
+    const validTo = isoDateOnly(dateRange.todate);
+
+    // ---- other did / component content that must not be lost ---------
+    for (const physloc of asArray(did.physloc)) {
+      const value = textValue(physloc);
+      if (value) {
+        properties.push({
+          element: "physloc",
+          localtype: attribute(physloc, "localtype"),
+          label: null,
+          value,
+        });
+      }
+    }
+
+    // accessrestrict (sekretess) sits in a nested <archdesc> inside <c>
+    // in this export, but EAD3 also allows it directly in <c>.
+    const accessRestrict =
+      [object, child(object, "archdesc")]
+        .map((holder) => textValue(holder.accessrestrict))
+        .filter(Boolean)
+        .join("\n") || null;
+
+    const legalstatus = textValue(object.legalstatus);
+    if (legalstatus) {
+      properties.push({
+        element: "legalstatus",
+        localtype: null,
+        label: null,
+        value: legalstatus,
+      });
+    }
+
+    for (const relation of asArray(child(object, "relations").relation)) {
+      properties.push({
+        element: "relation",
+        localtype: attribute(relation, "otherrelationtype"),
+        label: attribute(relation, "linktitle"),
+        value: attribute(relation, "href"),
+      });
+    }
+
     const node = {
       nodeType:
         elementName === "archdesc"
@@ -238,6 +339,7 @@ class EadMapper {
           : "ead_component",
       name: originalName || fallbackName || unitid,
       unitid,
+      unitidLabel,
       eadId: attribute(object, "id"),
       level: attribute(object, "level"),
       otherlevel: attribute(object, "otherlevel"),
@@ -247,6 +349,13 @@ class EadMapper {
       description: firstText(did.abstract, object.abstract),
       scopeContent: scopeContentValue(object.scopecontent),
       appraisal: textValue(object.appraisal),
+      accessRestrict,
+      modifiedAt,
+      modifiedBy,
+      validFrom,
+      validTo,
+      properties,
+      refs,
       children: [],
     };
 

@@ -68,21 +68,14 @@ class EadImportService {
       );
     }
 
-    let structureId = input.structureId;
-
-    if (hasStructureName) {
-      console.log("[EAD IMPORT] structureName:", JSON.stringify(input.structureName));
-  structureId = await this.repository.findOrCreateStructure(
-    input.structureName.trim(),
-    result.metadata
-    );
-    }
-
+    // The repository creates the structure INSIDE its transaction (so a failed
+    // import leaves no empty structure behind) and fills version/description
+    // from the classificationstructure wrapper.
     return this.repository.importDocument({
-      structureId,
+      structureId: hasStructureId ? input.structureId : null,
+      structureName: hasStructureName ? input.structureName.trim() : null,
       metadata: result.metadata,
       rootNode: result.rootNode,
-      sourceXml: input.xml,
       sourceFileName: input.sourceFileName,
     });
   }

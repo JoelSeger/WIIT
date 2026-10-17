@@ -4,6 +4,7 @@ const multer = require("multer");
 const {
   previewImport,
   importEad,
+  getTree,
 } = require("../controllers/ead.controller");
 
 const router = express.Router();
@@ -25,6 +26,7 @@ const upload = multer({
   },
 });
 
+router.get("/tree/:structureId", getTree);
 router.post("/import/preview", upload.single("file"), previewImport);
 router.post("/import", upload.single("file"), importEad);
 router.post("/test-upload", upload.single("file"), (req, res) => {

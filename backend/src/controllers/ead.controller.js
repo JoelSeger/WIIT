@@ -26,6 +26,12 @@ function getXmlFromRequest(req) {
   return req.file.buffer.toString("utf8");
 }
 
+async function getTree(req, res, next) {
+  try {
+    const tree = await new EadRepository(db).getTree(Number(req.params.structureId));
+    res.json(tree);
+  } catch (e) { next(e); }
+}
 
 async function previewImport(req, res, next) {
   console.log("[EAD PREVIEW] Request received");
@@ -62,7 +68,6 @@ async function previewImport(req, res, next) {
 
 
 async function importEad(req, res, next) {
-  console.log("--- تم استلام طلب الـ Import بنجاح في الـ Controller! ---");
   try {
     const xml = getXmlFromRequest(req);
 
@@ -117,4 +122,5 @@ async function importEad(req, res, next) {
 module.exports = {
   previewImport,
   importEad,
+  getTree,
 };
