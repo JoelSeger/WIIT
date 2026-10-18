@@ -3,3 +3,12 @@
   font-family: system-ui, sans-serif;
   padding: 1rem 2rem;
 }
+
+.content {
+  display: flex;
+
+  main {
+    flex: 1;
+    min-width: 0;
+  }
+}

@@ -1,8 +1,13 @@
-<header>
-  <h1>{{ title() }}</h1>
-  <p>Webbapp för informationsvisning i trädstruktur</p>
-</header>
+<app-header></app-header>
+<app-nav></app-nav>
 
-<main>
-  <router-outlet />
-</main>
+<div class="content">
+  <app-menu></app-menu>
+
+  <main>
+    <router-outlet />
+  </main>
+</div>
+
+<router-outlet />
+

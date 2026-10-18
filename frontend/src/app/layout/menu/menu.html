@@ -1,0 +1,30 @@
+<aside class="menu" [class.closed]="!isOpen">
+
+  <div class="menu-top">
+    <button 
+    class="menu-toggle" 
+    type="button"
+    (click)="toggleMenu()"
+    [attr.aria-label]="isOpen ? 'Stäng menyn' : 'Öppna menyn'"
+    >
+
+    <img
+        src="/chevron-left.png"
+        alt=""
+        [class.rotated]="!isOpen"
+        />
+    </button>
+  </div>
+
+
+  <!-- Displays the menu content only when the menu is open -->
+  @if (isOpen) {
+
+  <div class="menu-content"></div>
+
+  <div class="menu-bottom">
+    <img src="/settings.png" alt="" />
+    <span>Inställningar</span>
+  </div>
+}
+</aside>

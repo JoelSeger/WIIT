@@ -1,0 +1,79 @@
+// SCSS variables
+$header-background: #ffffff;
+$text-color: #000000;
+$user-background: #e6e6e6;
+$header-height: 65px;
+$logo-size: 60px;
+$profile-size: 24px;
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: $header-background;
+  min-height: $header-height;
+  padding: 0.5rem 1.25rem;
+  box-sizing: border-box;
+
+  .header-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+
+    .logo {
+      width: $logo-size;
+      height: $logo-size;
+      object-fit: contain;
+      display: block;
+    }
+
+    .university-name {
+      font-size: 1.75rem;
+      font-weight: 600;
+      color: $text-color;
+    }
+  }
+
+  .header-user {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+
+    .user-label {
+      background-color: $user-background;
+      color: $text-color;
+      padding: 5px 18px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .user-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      padding: 0;
+      border: none;
+      border-radius: 50%;
+      background-color: $user-background;
+      cursor: pointer;
+
+      .profile-icon {
+        width: $profile-size;
+        height: $profile-size;
+        object-fit: contain;
+        display: block;
+      }
+
+      &:hover {
+        background-color: #d3d3d3;
+      }
+
+      &:focus-visible {
+        outline: 2px solid $text-color;
+        outline-offset: 2px;
+      }
+    }
+  }
+}
