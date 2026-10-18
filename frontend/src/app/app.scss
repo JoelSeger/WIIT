@@ -4,3 +4,12 @@
   display: block;
   font-family: system-ui, sans-serif;
 }
+
+.content {
+  display: flex;
+
+  main {
+    flex: 1;
+    min-width: 0;
+  }
+}

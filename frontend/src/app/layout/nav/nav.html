@@ -1,0 +1,31 @@
+<nav class="nav" aria-label="Huvudnavigation">
+  <div class="nav-left">
+    <button class="nav-button" type="button"
+      (click)="openMenu()" aria-label="Öppna menyn">
+      <img [src]="menuIconUrl" alt="" />
+    </button>
+
+    <button class="nav-button" type="button"
+      (click)="addItem()" aria-label="Lägg till">
+      <img [src]="addIconUrl" alt="" />
+    </button>
+
+    <button class="nav-button" type="button"
+      (click)="goHome()" aria-label="Startsida">
+      <img [src]="homeIconUrl" alt="" />
+    </button>
+
+    <button class="nav-button" type="button"
+      (click)="download()" aria-label="Ladda ner">
+      <img [src]="downloadIconUrl" alt="" />
+    </button>
+  </div>
+
+  <div class="nav-right">
+    <button class="nav-button" type="button"
+      (click)="logout()" aria-label="Logga ut">
+      <img [src]="logoutIconUrl" alt="" />
+    </button>
+  </div>
+</nav>
+
