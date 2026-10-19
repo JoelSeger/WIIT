@@ -9,7 +9,26 @@
  * `cond && el(...)` without if-statements.
  */
 
-function escapeText(s) {
+/** Attribute values: null / undefined / false / '' are left out of the output. */
+export type AttrValue = string | number | boolean | null | undefined;
+export type Attrs = Record<string, AttrValue>;
+
+/**
+ * A child in a content list. The falsy variants are what `cond && el(...)` produces
+ * when cond is a string, number or optional value – they are skipped when rendering.
+ */
+export type XmlChild = XmlElement | null | undefined | false | '' | 0;
+
+/** Text content, a list of children, or nothing (self-closing tag). */
+export type XmlContent = string | number | XmlChild[] | null | undefined;
+
+export interface XmlElement {
+  name: string;
+  attrs: Attrs;
+  content: XmlContent;
+}
+
+export function escapeText(s: unknown): string {
   return String(s)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -18,15 +37,17 @@ function escapeText(s) {
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
 }
 
-function escapeAttr(s) {
+export function escapeAttr(s: unknown): string {
   return escapeText(s).replace(/"/g, '&quot;');
 }
 
-function el(name, attrs = {}, content = null) {
+export function el(name: string, attrs: Attrs = {}, content: XmlContent = null): XmlElement {
   return { name, attrs, content };
 }
 
-function render(node, depth = 0) {
+const isElement = (c: XmlChild): c is XmlElement => Boolean(c);
+
+export function render(node: XmlElement, depth = 0): string {
   const pad = '  '.repeat(depth);
   const attrs = Object.entries(node.attrs || {})
     .filter(([, v]) => v !== null && v !== undefined && v !== false && v !== '')
@@ -34,19 +55,17 @@ function render(node, depth = 0) {
     .join('');
 
   const content = node.content;
-  if (content === null || content === undefined || (Array.isArray(content) && content.filter(Boolean).length === 0)) {
+  if (content === null || content === undefined || (Array.isArray(content) && content.filter(isElement).length === 0)) {
     return `${pad}<${node.name}${attrs}/>`;
   }
   if (!Array.isArray(content)) {
     return `${pad}<${node.name}${attrs}>${escapeText(content)}</${node.name}>`;
   }
-  const inner = content.filter(Boolean).map((c) => render(c, depth + 1)).join('\n');
+  const inner = content.filter(isElement).map((c) => render(c, depth + 1)).join('\n');
   return `${pad}<${node.name}${attrs}>\n${inner}\n${pad}</${node.name}>`;
 }
 
 /** Valid xml:id / @id values must be NCNames (start with a letter or _, no spaces or colons). */
-function isNcName(s) {
+export function isNcName(s: unknown): s is string {
   return typeof s === 'string' && /^[A-Za-z_][A-Za-z0-9._-]*$/.test(s);
 }
-
-module.exports = { el, render, escapeText, escapeAttr, isNcName };

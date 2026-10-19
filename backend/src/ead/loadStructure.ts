@@ -1,3 +1,5 @@
+import type { Knex } from 'knex';
+
 /**
  * Reads one structure and everything the EAD3 export needs, in 6 queries
  * (not one query per node), and returns plain JS objects.
@@ -12,14 +14,196 @@
  *   node     { id, reference_code, title, ..., type, properties: [], relations: [], children: [] }
  */
 
-async function loadStructure(knex, structureId, { publicOnly = false } = {}) {
-  const structure = await knex('structures').where({ id: structureId }).first();
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+/** MSSQL returns DATE as a JS Date; SQLite (tests) as a string. */
+export type DbDate = Date | string | null;
+/** MSSQL returns BIT as boolean; SQLite as 0/1. */
+export type DbBool = boolean | number;
+
+export type EadLevel =
+  | 'collection' | 'fonds' | 'class' | 'recordgrp' | 'series' | 'subfonds'
+  | 'subgrp' | 'subseries' | 'file' | 'item' | 'otherlevel';
+
+export type PropertyDataType = 'text' | 'longtext' | 'number' | 'date' | 'boolean' | 'url';
+
+export type CreatorType = 'corporate' | 'person' | 'family';
+
+/** A row in `structures` (the columns the export uses). */
+export interface StructureRow {
+  id: number;
+  code: string;
+  name: string;
+  structure_type: string;
+  description: string | null;
+  valid_from: DbDate;
+  valid_to: DbDate;
+  is_published: DbBool;
+  agency_code: string | null;
+  agency_name: string | null;
+  language_code: string | null;
+  license: string | null;
+  version: string | null;
+  previous_structure_id: number | null;
+}
+
+/** nodes joined with node_types, as selected in loadStructure. */
+export interface NodeQueryRow {
+  id: number;
+  parent_id: number | null;
+  reference_code: string | null;
+  previous_reference_code: string | null;
+  title: string;
+  sort_order: number;
+  is_published: DbBool;
+  external_id: string | null;
+  valid_from: DbDate;
+  valid_to: DbDate;
+  description: string | null;
+  portal_url: string | null;
+  type_code: string;
+  type_name: string;
+  ead_level: EadLevel;
+  ead_otherlevel: string | null;
+}
+
+/** node_property_values joined with property_definitions. Only the column matching data_type is set. */
+export interface PropertyQueryRow {
+  node_id: number;
+  key: string;
+  label: string;
+  data_type: PropertyDataType;
+  ead_element: string | null;
+  sort_order: number;
+  value_text: string | null;
+  value_number: number | string | null;   // DECIMAL can come back as a string
+  value_date: DbDate;
+  value_boolean: DbBool | null;
+}
+
+/** node_relations joined with relation_types and the target node + its structure. */
+export interface RelationQueryRow {
+  from_node_id: number;
+  relation_code: string;
+  relation_name: string;
+  ead_element: string | null;
+  target_id: number;
+  target_reference_code: string | null;
+  target_title: string;
+  target_is_published: DbBool;
+  target_structure_name: string;
+  target_structure_is_published: DbBool;
+}
+
+interface ArchiveQueryRow {
+  id: number;
+  reference_code: string | null;
+  name: string;
+  start_year: number | null;
+  end_year: number | null;
+  description: string | null;
+  external_id: string | null;
+  is_published: DbBool;
+  creator_id: number;
+  creator_name: string;
+  creator_type: CreatorType;
+  creator_start_year: number | null;
+  creator_end_year: number | null;
+  creator_description: string | null;
+  creator_is_published: DbBool;
+}
+
+export interface NodeType {
+  code: string;
+  name: string;
+  ead_level: EadLevel;
+  ead_otherlevel: string | null;
+}
+
+export interface NodeProperty {
+  key: string;
+  label: string;
+  data_type: PropertyDataType;
+  ead_element: string | null;
+  /** Always a string, already formatted (dates as YYYY-MM-DD, booleans as Ja/Nej). */
+  value: string;
+}
+
+export interface NodeRelation {
+  code: string;
+  name: string;
+  ead_element: string | null;
+  target: {
+    id: number;
+    reference_code: string | null;
+    title: string;
+    structure_name: string;
+  };
+}
+
+export interface TreeNode {
+  id: number;
+  parent_id: number | null;
+  reference_code: string | null;
+  previous_reference_code: string | null;
+  title: string;
+  sort_order: number;
+  is_published: boolean;
+  external_id: string | null;
+  valid_from: DbDate;
+  valid_to: DbDate;
+  description: string | null;
+  portal_url: string | null;
+  type: NodeType;
+  properties: NodeProperty[];
+  relations: NodeRelation[];
+  children: TreeNode[];
+}
+
+export interface ArchiveCreator {
+  id: number;
+  name: string;
+  type: CreatorType;
+  start_year: number | null;
+  end_year: number | null;
+  description: string | null;
+}
+
+export interface Archive {
+  id: number;
+  reference_code: string | null;
+  name: string;
+  start_year: number | null;
+  end_year: number | null;
+  description: string | null;
+  external_id: string | null;
+  creator: ArchiveCreator | null;
+}
+
+export interface LoadedStructure {
+  structure: StructureRow;
+  archive: Archive | null;
+  roots: TreeNode[];
+}
+
+export interface LoadOptions {
+  publicOnly?: boolean;
+}
+
+// ─── Queries ────────────────────────────────────────────────────────────────
+
+export async function loadStructure(
+  knex: Knex,
+  structureId: number,
+  { publicOnly = false }: LoadOptions = {},
+): Promise<LoadedStructure | null> {
+  const structure = await knex<StructureRow>('structures').where({ id: structureId }).first();
   if (!structure) return null;
   if (publicOnly && !structure.is_published) return null;
 
   const archive = await loadArchive(knex, structureId, publicOnly);
 
-  const nodeRows = await knex('nodes as n')
+  const nodeRows: NodeQueryRow[] = await knex('nodes as n')
     .join('node_types as nt', 'nt.id', 'n.node_type_id')
     .where('n.structure_id', structureId)
     .select(
@@ -46,10 +230,10 @@ async function loadStructure(knex, structureId, { publicOnly = false } = {}) {
     )
     .orderBy([{ column: 'v.node_id' }, { column: 'd.sort_order' }]);
   if (publicOnly) propQuery.where('d.is_public', true);
-  const propRows = await propQuery;
+  const propRows: PropertyQueryRow[] = await propQuery;
 
   // Relations FROM nodes in this tree, with the target node (usually in another tree)
-  const relQuery = knex('node_relations as r')
+  const relRows: RelationQueryRow[] = await knex('node_relations as r')
     .join('relation_types as rt', 'rt.id', 'r.relation_type_id')
     .join('nodes as src', 'src.id', 'r.from_node_id')
     .join('nodes as tgt', 'tgt.id', 'r.to_node_id')
@@ -61,7 +245,6 @@ async function loadStructure(knex, structureId, { publicOnly = false } = {}) {
       'tgt.title as target_title', 'tgt.is_published as target_is_published',
       'ts.name as target_structure_name', 'ts.is_published as target_structure_is_published',
     );
-  const relRows = await relQuery;
 
   return { structure, archive, roots: buildTree(nodeRows, propRows, relRows, publicOnly) };
 }
@@ -71,7 +254,7 @@ async function loadStructure(knex, structureId, { publicOnly = false } = {}) {
  * the one whose link started most recently wins. Public mode skips unpublished archives
  * and leaves out an unpublished creator.
  */
-async function loadArchive(knex, structureId, publicOnly) {
+async function loadArchive(knex: Knex, structureId: number, publicOnly: boolean): Promise<Archive | null> {
   const q = knex('archive_structures as l')
     .join('archives as a', 'a.id', 'l.archive_id')
     .join('archive_creators as c', 'c.id', 'a.archive_creator_id')
@@ -85,7 +268,7 @@ async function loadArchive(knex, structureId, publicOnly) {
     )
     .orderBy([{ column: 'l.valid_from', order: 'desc' }, { column: 'a.id' }]);
   if (publicOnly) q.where('a.is_published', true);
-  const row = await q.first();
+  const row = (await q.first()) as ArchiveQueryRow | undefined;
   if (!row) return null;
 
   const showCreator = !publicOnly || Boolean(row.creator_is_published);
@@ -108,9 +291,16 @@ async function loadArchive(knex, structureId, publicOnly) {
   };
 }
 
+// ─── Pure helpers ───────────────────────────────────────────────────────────
+
 /** Pure: rows → nested tree. Exported for tests. */
-function buildTree(nodeRows, propRows, relRows, publicOnly = false) {
-  const byId = new Map();
+export function buildTree(
+  nodeRows: NodeQueryRow[],
+  propRows: PropertyQueryRow[],
+  relRows: RelationQueryRow[],
+  publicOnly = false,
+): TreeNode[] {
+  const byId = new Map<number, TreeNode>();
   for (const r of nodeRows) {
     byId.set(r.id, {
       id: r.id,
@@ -160,21 +350,21 @@ function buildTree(nodeRows, propRows, relRows, publicOnly = false) {
     });
   }
 
-  const roots = [];
+  const roots: TreeNode[] = [];
   for (const node of byId.values()) {
     if (node.parent_id == null) roots.push(node);
     else byId.get(node.parent_id)?.children.push(node);
   }
 
-  const order = (a, b) => a.sort_order - b.sort_order || a.id - b.id;
-  const prune = (list) => list
+  const order = (a: TreeNode, b: TreeNode): number => a.sort_order - b.sort_order || a.id - b.id;
+  const prune = (list: TreeNode[]): TreeNode[] => list
     .filter((n) => !publicOnly || n.is_published)    // unpublished hides its whole branch
     .sort(order)
     .map((n) => ({ ...n, children: prune(n.children) }));
   return prune(roots);
 }
 
-function pickValue(p) {
+function pickValue(p: PropertyQueryRow): string | null {
   switch (p.data_type) {
     case 'number':  return p.value_number == null ? null : String(Number(p.value_number));
     case 'date':    return p.value_date == null ? null : toIsoDate(p.value_date);
@@ -184,10 +374,8 @@ function pickValue(p) {
 }
 
 /** MSSQL returns DATE as a JS Date; SQLite (tests) as a string. Normalise to 'YYYY-MM-DD'. */
-function toIsoDate(d) {
+export function toIsoDate(d: DbDate | undefined): string | null {
   if (d == null) return null;
   if (d instanceof Date) return d.toISOString().slice(0, 10);
   return String(d).slice(0, 10);
 }
-
-module.exports = { loadStructure, buildTree, toIsoDate };
