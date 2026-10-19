@@ -132,11 +132,11 @@ export function makeProcessesRouter({ db, requireRole }:Deps) {
 
     //Reject if without a name (whitespace only).
     if (!body.title || typeof body.title !== 'string' ||body.title.trim() === '') {
-      return void res.status(400).json({ error: 'title krävs (F3.1)' });
+      return void res.status(400).json({ error: 'title krävs' });
     }
     //Every new node needs a parent.
     if (!Number.isInteger(body.parentId) || (body.parentId as number) <= 0) {
-      return void res.status(400).json({ error: 'parentId krävs (F6.1.2)' });
+      return void res.status(400).json({ error: 'parentId krävs' });
     }
 
     try{
@@ -229,7 +229,7 @@ export function makeProcessesRouter({ db, requireRole }:Deps) {
           return void res.status(400).json({ error: 'En nod kan inte vara sin egen förälder'});
         }
         if (await isDescendant(db, id, body.parentId)) {
-          return void res.status(400).json({ error: 'Flytten skulle skapa en cirkel (F6.1.1)' });
+          return void res.status(400).json({ error: 'Flytten skulle skapa en cirkel' });
         }
         const parent = await db('nodes')
           .where({ id: body.parentId, structure_id: structureId })
