@@ -20,13 +20,16 @@
   "dependencies": {
     "dotenv": "^18.0.8",
     "express": "^5.3.0",
+    "fast-xml-parser": "^5.11.2",
     "knex": "^3.3.0",
     "mssql": "^12.7.9",
+    "multer": "^2.4.0",
     "tedious": "^20.3.7"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/mssql": "^12.3.0",
+    "@types/multer": "^2.3.0",
     "@types/node": "^26.6.5",
     "better-sqlite3": "^13.0.3",
     "tsx": "^4.23.15",
