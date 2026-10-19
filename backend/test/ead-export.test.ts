@@ -113,76 +113,69 @@ async function load(knex: Knex, id: number, opts?: LoadOptions): Promise<LoadedS
   await seed(knex);
   await seed(knex);                                   // must be re-runnable (clears in the right order)
   const count = await knex('nodes').count({ n: '*' }).first();
-  assert.equal(Number(count?.n), 15, 'seed re-run gives the same data');
+  assert.equal(Number(count?.n), 26, 'seed re-run gives the same data');
   console.log('✓ seed runs twice');
 
   const fixed = { generatedAt: new Date('2026-10-11T12:00:00Z') };
-  const klass = await idOf(knex, 'structures', 'klass-2021');
-  const forteckning = await idOf(knex, 'structures', 'mau-001-forteckning');
+  const ihp = await idOf(knex, 'structures', 'ihp');
   const forv = await idOf(knex, 'structures', 'forvaring');
 
-  // 1. Klassificering: archive + creator on top, version, previous beteckning
-  const klassXml = buildEad3(await load(knex, klass), fixed);
-  assert.match(klassXml, /<edition>2021<\/edition>/);
-  assert.match(klassXml, /<archdesc level="fonds">/);
-  assert.match(klassXml, /<unitid>MAU-001<\/unitid>/);
-  assert.match(klassXml, /<origination label="Arkivbildare">\s*<corpname>\s*<part>Malmö universitet<\/part>/);
-  assert.match(klassXml, /<bioghist localtype="arkivbildare">/);
-  assert.match(klassXml, /<fromdate standarddate="1998">/);
-  assert.match(klassXml, /<c level="class"/);
-  assert.match(klassXml, /<unitid localtype="tidigare_beteckning" label="Tidigare beteckning">2.3<\/unitid>/);
-  assert.match(klassXml, /<odd localtype="ansvarig">/);
-  validate(klassXml, 'klass-2021.ead3.xml');
-  console.log('✓ klassificering: arkiv, arkivbildare, version, tidigare beteckning');
+  // 1. Informationshanteringsplan: archive + creator on top, version, levels as in Klara
+  const ihpXml = buildEad3(await load(knex, ihp), fixed);
+  assert.match(ihpXml, /<edition>2<\/edition>/);
+  assert.match(ihpXml, /<archdesc level="fonds">/);
+  assert.match(ihpXml, /<unitid>MAU-001<\/unitid>/);
+  assert.match(ihpXml, /<origination label="Arkivbildare">\s*<corpname>\s*<part>Malmö universitet<\/part>/);
+  assert.match(ihpXml, /<c level="class"/);
+  assert.match(ihpXml, /<unitid>4.2.1<\/unitid>\s*<unittitle>Förbereda forskning och söka extern finansiering<\/unittitle>/);
+  assert.match(ihpXml, /<odd localtype="ansvarig">/);
+  validate(ihpXml, 'ihp.ead3.xml');
+  console.log('✓ informationshanteringsplan: arkiv, arkivbildare, version, nivåer');
 
   // 1b. Handlingsslag / handlingstyp (Klara's recordgroup / recordtype) and their fields
-  assert.match(klassXml, /<c level="otherlevel" otherlevel="recordgroup"/);
-  assert.match(klassXml, /<c level="otherlevel" otherlevel="recordtype"/);
-  assert.equal((klassXml.match(/<unitid>HS<\/unitid>/g) || []).length, 2, 'HS under two processes (008)');
-  assert.match(klassXml, /<appraisal localtype="gallringsforeskrifter">[\s\S]*?RA-FS 2021:6/);
-  assert.match(klassXml, /<odd localtype="bevaras">[\s\S]*?<p>Gallras<\/p>/, 'enum value (009) exported as text');
-  assert.match(klassXml, /<odd localtype="diariefors">[\s\S]*?<p>Nej<\/p>/, 'ja/nej exported');
-  assert.match(klassXml, /<accessrestrict localtype="sekretess">[\s\S]*?OSL 21 kap/);
-  const klassPub = buildEad3(await load(knex, klass, { publicOnly: true }), fixed);
-  assert.doesNotMatch(klassPub, /OSL 21 kap/, 'sekretess on handlingstyp hidden publicly');
-  validate(klassPub, 'klass-2021-public.ead3.xml');
+  assert.match(ihpXml, /<c level="otherlevel" otherlevel="recordgroup"/);
+  assert.match(ihpXml, /<c level="otherlevel" otherlevel="recordtype"/);
+  assert.equal((ihpXml.match(/<unitid>HS<\/unitid>/g) || []).length, 2, 'HS under two processes (008)');
+  assert.match(ihpXml, /<appraisal localtype="gallringsforeskrifter">[\s\S]*?RA-FS 2021:6/);
+  assert.match(ihpXml, /<odd localtype="bevaras">[\s\S]*?<p>Gallras<\/p>/, 'enum value (009) exported as text');
+  assert.match(ihpXml, /<odd localtype="diariefors">[\s\S]*?<p>Nej<\/p>/, 'ja/nej exported');
+  assert.match(ihpXml, /<accessrestrict localtype="sekretess">[\s\S]*?OSL 24 kap/);
+  const ihpPub = buildEad3(await load(knex, ihp, { publicOnly: true }), { ...fixed, publicOnly: true });
+  assert.doesNotMatch(ihpPub, /OSL 24 kap/, 'sekretess on handlingstyp hidden publicly');
+  assert.match(ihpPub, /Malmö universitet<\/part>/);
+  validate(ihpPub, 'ihp-public.ead3.xml');
   console.log('✓ handlingsslag/handlingstyp: listruta, ja/nej, sekretess hidden publicly');
 
-  // 2. Arkivförteckning, full
-  const fullXml = buildEad3(await load(knex, forteckning), fixed);
-  assert.match(fullXml, /<c level="series"/);
-  assert.match(fullXml, /<c level="file"/);
-  assert.match(fullXml, /<physloc localtype="forvaras_i">Förvaring MAU: A-3-12 Kartong 12<\/physloc>/);
-  assert.match(fullXml, /<odd localtype="redovisas_under">\s*<head>redovisas under<\/head>\s*<p>Klassificeringsstruktur 2021–: 1.2.3 Hantera leverantörsfakturor<\/p>/);
-  assert.match(fullXml, /<accessrestrict localtype="sekretess">/);
-  assert.match(fullXml, /<appraisal localtype="gallring">/);
-  validate(fullXml, 'forteckning-full.ead3.xml');
-  console.log('✓ arkivförteckning: förvaras i + redovisas under, sekretess i full export');
+  // 2. Förvaring, full: Klara's otherlevel names, placering in <did>, link to the IHP
+  const forvXml = buildEad3(await load(knex, forv), fixed);
+  assert.match(forvXml, /<c level="otherlevel" otherlevel="Verksamhetssystem"/);
+  assert.match(forvXml, /<c level="otherlevel" otherlevel="Svit"/);
+  assert.match(forvXml, /<c level="otherlevel" otherlevel="Arkivbox"/);
+  assert.match(forvXml, /<physloc localtype="placering" label="Placering">Arkivlokal, hylla 3<\/physloc>/);
+  assert.match(forvXml, /<odd localtype="redovisas_under">\s*<head>redovisas under<\/head>\s*<p>Informationshanteringsplan: HT1 Ansökan om extern finansiering<\/p>/);
+  assert.ok(forvXml.indexOf('Ladok') < forvXml.indexOf('Primula'), 'sort_order respected');
+  validate(forvXml, 'forvaring-full.ead3.xml');
+  console.log('✓ förvaring: verksamhetssystem, svit, arkivbox, redovisas under');
 
-  // 3. Arkivförteckning, public
-  const pubXml = buildEad3(await load(knex, forteckning, { publicOnly: true }), { ...fixed, publicOnly: true });
-  assert.doesNotMatch(pubXml, /sekretess/, 'is_public = 0 field hidden');
-  assert.doesNotMatch(pubXml, /physloc/, 'storage in unpublished Förvaring hidden');
-  assert.match(pubXml, /redovisas_under/, 'link to a published classification is shown');
-  assert.match(pubXml, /Malmö universitet<\/part>/);
-  validate(pubXml, 'forteckning-public.ead3.xml');
-  console.log('✓ public export hides secret field and storage');
+  // 3. Förvaring, public: placering hidden, link to a published classification still shown
+  const forvPub = buildEad3(await load(knex, forv, { publicOnly: true }), { ...fixed, publicOnly: true });
+  assert.doesNotMatch(forvPub, /physloc/, 'is_public = 0 field hidden');
+  assert.match(forvPub, /redovisas_under/, 'link to a published classification is shown');
+  validate(forvPub, 'forvaring-public.ead3.xml');
+  console.log('✓ public export hides placering');
 
   // 4. Unpublished creator → no <origination> publicly, but still in the full export
   await knex('archive_creators').where({ name: 'Malmö universitet' }).update({ is_published: false });
-  const hidden = buildEad3(await load(knex, forteckning, { publicOnly: true }), { ...fixed, publicOnly: true });
+  const hidden = buildEad3(await load(knex, ihp, { publicOnly: true }), { ...fixed, publicOnly: true });
   assert.doesNotMatch(hidden, /origination/);
-  assert.match(buildEad3(await load(knex, forteckning), fixed), /origination/);
-  validate(hidden, 'forteckning-public-nocreator.ead3.xml');
+  assert.match(buildEad3(await load(knex, ihp), fixed), /origination/);
+  validate(hidden, 'ihp-public-nocreator.ead3.xml');
   console.log('✓ unpublished arkivbildare hidden publicly');
 
-  // 5. Förvaring: unpublished → not public; full export has both top nodes under the archive
+  // 5. Unpublished structure → nothing publicly
+  await knex('structures').where({ id: forv }).update({ is_published: false });
   assert.equal(await loadStructure(knex, forv, { publicOnly: true }), null);
-  const forvXml = buildEad3(await load(knex, forv), fixed);
-  assert.match(forvXml, /<c level="otherlevel" otherlevel="kartong"/);
-  assert.ok(forvXml.indexOf('Arkivlokal A') < forvXml.indexOf('Arkivlokal B'), 'sort_order respected');
-  validate(forvXml, 'forvaring-full.ead3.xml');
-  console.log('✓ förvaring: not public, full export ok');
+  console.log('✓ unpublished structure not public');
 
   // 6. Structure with no archive link → falls back to the old behaviour
   const [inserted] = await knex('structures').insert(
