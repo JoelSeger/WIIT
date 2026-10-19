@@ -1,23 +1,38 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "server.js",
+  "description": "WIIT",
+  "main": "dist/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "migrate": "NODE_OPTIONS='--import tsx' knex migrate:latest --knexfile knexfile.ts",
+    "migrate:make": "NODE_OPTIONS='--import tsx' knex migrate:make --knexfile knexfile.ts",
+    "migrate:rollback": "NODE_OPTIONS='--import tsx' knex migrate:rollback --knexfile knexfile.ts",
+    "migrate:status": "NODE_OPTIONS='--import tsx' knex migrate:status --knexfile knexfile.ts",
+    "seed": "NODE_OPTIONS='--import tsx' knex seed:run --knexfile knexfile.ts",
+    "seed:make": "NODE_OPTIONS='--import tsx' knex seed:make --knexfile knexfile.ts"
   },
   "keywords": [],
-  "author": "",
-  "license": "GPL-3.0-only",
   "type": "commonjs",
   "dependencies": {
-    "dotenv": "^18.0.5",
-    "express": "^5.2.1",
+    "dotenv": "^18.0.8",
+    "express": "^5.3.0",
     "knex": "^3.3.0",
-    "mssql": "^12.7.2",
-    "tedious": "^20.3.3"
+    "mssql": "^12.7.9",
+    "tedious": "^20.3.7"
   },
   "devDependencies": {
-    "better-sqlite3": "^13.0.3"
+    "@types/express": "^5.0.6",
+    "@types/mssql": "^12.3.0",
+    "@types/node": "^26.6.5",
+    "better-sqlite3": "^13.0.3",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
   }
 }
