@@ -25,7 +25,7 @@ export type EadLevel =
   | 'collection' | 'fonds' | 'class' | 'recordgrp' | 'series' | 'subfonds'
   | 'subgrp' | 'subseries' | 'file' | 'item' | 'otherlevel';
 
-export type PropertyDataType = 'text' | 'longtext' | 'number' | 'date' | 'boolean' | 'url';
+export type PropertyDataType = 'text' | 'longtext' | 'number' | 'date' | 'boolean' | 'url' | 'enum'; // enum: migration 009, value in value_text
 
 export type CreatorType = 'corporate' | 'person' | 'family';
 

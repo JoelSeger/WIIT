@@ -63,6 +63,10 @@ async function createTables(knex: Knex): Promise<void> {
     t.increments('id'); t.integer('node_type_id'); t.string('key'); t.string('label'); t.string('data_type');
     t.boolean('is_public').defaultTo(true); t.string('ead_element'); t.text('help_text'); t.integer('sort_order').defaultTo(0);
   });
+  await knex.schema.createTable('property_options', (t) => {          // migration 009
+    t.increments('id'); t.integer('property_definition_id'); t.string('value');
+    t.integer('sort_order').defaultTo(0); t.boolean('is_active').defaultTo(true);
+  });
   await knex.schema.createTable('node_property_values', (t) => {
     t.increments('id'); t.integer('node_id'); t.integer('property_definition_id'); t.text('value_text');
     t.decimal('value_number'); t.date('value_date'); t.boolean('value_boolean'); t.integer('updated_by');
@@ -109,7 +113,7 @@ async function load(knex: Knex, id: number, opts?: LoadOptions): Promise<LoadedS
   await seed(knex);
   await seed(knex);                                   // must be re-runnable (clears in the right order)
   const count = await knex('nodes').count({ n: '*' }).first();
-  assert.equal(Number(count?.n), 9, 'seed re-run gives the same data');
+  assert.equal(Number(count?.n), 15, 'seed re-run gives the same data');
   console.log('✓ seed runs twice');
 
   const fixed = { generatedAt: new Date('2026-10-11T12:00:00Z') };
@@ -130,6 +134,19 @@ async function load(knex: Knex, id: number, opts?: LoadOptions): Promise<LoadedS
   assert.match(klassXml, /<odd localtype="ansvarig">/);
   validate(klassXml, 'klass-2021.ead3.xml');
   console.log('✓ klassificering: arkiv, arkivbildare, version, tidigare beteckning');
+
+  // 1b. Handlingsslag / handlingstyp (Klara's recordgroup / recordtype) and their fields
+  assert.match(klassXml, /<c level="otherlevel" otherlevel="recordgroup"/);
+  assert.match(klassXml, /<c level="otherlevel" otherlevel="recordtype"/);
+  assert.equal((klassXml.match(/<unitid>HS<\/unitid>/g) || []).length, 2, 'HS under two processes (008)');
+  assert.match(klassXml, /<appraisal localtype="gallringsforeskrifter">[\s\S]*?RA-FS 2021:6/);
+  assert.match(klassXml, /<odd localtype="bevaras">[\s\S]*?<p>Gallras<\/p>/, 'enum value (009) exported as text');
+  assert.match(klassXml, /<odd localtype="diariefors">[\s\S]*?<p>Nej<\/p>/, 'ja/nej exported');
+  assert.match(klassXml, /<accessrestrict localtype="sekretess">[\s\S]*?OSL 21 kap/);
+  const klassPub = buildEad3(await load(knex, klass, { publicOnly: true }), fixed);
+  assert.doesNotMatch(klassPub, /OSL 21 kap/, 'sekretess on handlingstyp hidden publicly');
+  validate(klassPub, 'klass-2021-public.ead3.xml');
+  console.log('✓ handlingsslag/handlingstyp: listruta, ja/nej, sekretess hidden publicly');
 
   // 2. Arkivförteckning, full
   const fullXml = buildEad3(await load(knex, forteckning), fixed);

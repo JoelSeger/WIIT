@@ -5,10 +5,13 @@
  *   Arkiv:             MAU-001 Malmö universitets arkiv (uses all three structures below)
  *
  *   Klassificering:    1 Styra och leda verksamheten → 2 Ekonomi → 2.3 Hantera leverantörsfakturor
+ *                        → HS Handlingsslag → HT1 Leverantörsfaktura, HT2 Betalningspåminnelse
+ *                      (+ 1.2.4 Hantera kundfakturor → HS → HT1 – same codes under another parent, migration 008)
  *   Arkivförteckning:  F2 Fakturor → F2:1 Volym 1
  *   Förvaring:         Arkivlokal A → Hylla 3 → Kartong 12      (+ Arkivlokal B)
  *
  *   Relations:         F2 Fakturor --redovisas under--> 2.3 Hantera leverantörsfakturor
+ *                      F2 Fakturor --redovisas under--> HT1 Leverantörsfaktura
  *                      F2 Fakturor --förvaras i-->      Kartong 12
  *
  * Node types and fields are placeholders to confirm with Arkivfunktionen
@@ -24,6 +27,7 @@ exports.seed = async function (knex) {
   await knex('node_relations').del();
   await knex('relation_types').del();
   await knex('node_property_values').del();
+  await knex('property_options').del();
   await knex('property_definitions').del();
   await knex('archive_structures').del();
   await deleteTree(knex, 'nodes');            // leaves first – a parent with children is protected
@@ -96,6 +100,9 @@ exports.seed = async function (knex) {
   const omrade   = await t('verksamhetsomrade', 'Verksamhetsområde', 'klassificering', 'class');
   const pgrupp   = await t('processgrupp',      'Processgrupp',      'klassificering', 'class');
   const process  = await t('process',           'Process',           'klassificering', 'class');
+  // Below the process, as in Klara's KS_IHP.ead3: HS (recordgroup) → HT1, HT2 … (recordtype)
+  const hslag    = await t('handlingsslag',     'Handlingsslag',     'klassificering', 'otherlevel', 'recordgroup');
+  const htyp     = await t('handlingstyp',      'Handlingstyp',      'klassificering', 'otherlevel', 'recordtype');
   // Arkivförteckning
   const serie    = await t('serie',    'Serie',    'arkivforteckning', 'series');
   const delserie = await t('delserie', 'Delserie', 'arkivforteckning', 'subseries');
@@ -108,6 +115,8 @@ exports.seed = async function (knex) {
   await knex('node_type_rules').insert([
     { parent_type_id: omrade,   child_type_id: pgrupp },
     { parent_type_id: pgrupp,   child_type_id: process },
+    { parent_type_id: process,  child_type_id: hslag },
+    { parent_type_id: hslag,    child_type_id: htyp },
     { parent_type_id: serie,    child_type_id: delserie },
     { parent_type_id: serie,    child_type_id: volym },
     { parent_type_id: delserie, child_type_id: volym },
@@ -124,6 +133,25 @@ exports.seed = async function (knex) {
   const pSekr  = await pd({ node_type_id: serie, key: 'sekretess',   label: 'Sekretess (OSL)', data_type: 'text', ead_element: 'accessrestrict', sort_order: 4, is_public: false });
   const pAnsv  = await pd({ node_type_id: process, key: 'ansvarig',  label: 'Ansvarig roll', data_type: 'text', ead_element: null, sort_order: 1 });
 
+  // Handlingstyp – fields from the client's Excel (Sekretess, Gallringsföreskrifter, Bevaras, Diarieförs).
+  // Which field is fritext / listruta / ja-nej, and the dropdown choices, are PLACEHOLDERS
+  // to confirm with Arkivfunktionen. "Serie" is a link to the arkivförteckning (relation
+  // 'redovisas_under' below), not a field. Name and Beskrivning are nodes.title / nodes.description.
+  // ead_element follows Klara's export: sekretess → accessrestrict, legal basis → appraisal.
+  const hSekr  = await pd({ node_type_id: htyp, key: 'sekretess',             label: 'Sekretess',             data_type: 'text',    ead_element: 'accessrestrict', sort_order: 1, is_public: false,
+    help_text: 'Ange paragraf i OSL, t.ex. "OSL 21 kap. 1 §". Lämna tomt om ingen sekretess.' });
+  const hGallr = await pd({ node_type_id: htyp, key: 'gallringsforeskrifter', label: 'Gallringsföreskrifter', data_type: 'text',    ead_element: 'appraisal',      sort_order: 2,
+    help_text: 'Rättslig grund, t.ex. "RA-FS 2021:6". Själva gallringen görs manuellt.' });
+  const hBev   = await pd({ node_type_id: htyp, key: 'bevaras',               label: 'Bevaras / gallras',     data_type: 'enum',    ead_element: null,             sort_order: 3 });
+  const hDiar  = await pd({ node_type_id: htyp, key: 'diariefors',            label: 'Diarieförs',            data_type: 'boolean', ead_element: null,             sort_order: 4 });
+
+  // The choices of the dropdown (migration 009). The chosen text is stored in value_text.
+  await knex('property_options').insert([
+    { property_definition_id: hBev, value: 'Bevaras',               sort_order: 1 },
+    { property_definition_id: hBev, value: 'Gallras',               sort_order: 2 },
+    { property_definition_id: hBev, value: 'Gallras efter beslut',  sort_order: 3 },
+  ]);
+
   // ---- Klassificering tree -------------------------------------------------------
   const n = (row) => insert('nodes', { ...by, ...row });
   const k1  = await n({ structure_id: klass, node_type_id: omrade,  reference_code: '1',   title: 'Styra och leda verksamheten', is_published: true });
@@ -131,6 +159,31 @@ exports.seed = async function (knex) {
   const k23 = await n({ structure_id: klass, parent_id: k2, node_type_id: process, reference_code: '1.2.3', previous_reference_code: '2.3',
     title: 'Hantera leverantörsfakturor', is_published: true });
   await knex('node_property_values').insert({ node_id: k23, property_definition_id: pAnsv, value_text: 'Ekonomichef', updated_by: admin });
+
+  // HS → HT1, HT2 under the process
+  const hs23 = await n({ structure_id: klass, parent_id: k23, node_type_id: hslag, reference_code: 'HS', title: 'Handlingsslag', is_published: true });
+  const ht1  = await n({ structure_id: klass, parent_id: hs23, node_type_id: htyp, reference_code: 'HT1', title: 'Leverantörsfaktura',
+    description: 'Faktura från leverantör med attest och underlag.', is_published: true });
+  const ht2  = await n({ structure_id: klass, parent_id: hs23, node_type_id: htyp, reference_code: 'HT2', title: 'Betalningspåminnelse',
+    sort_order: 1, is_published: true });
+  await knex('node_property_values').insert([
+    { node_id: ht1, property_definition_id: hGallr, value_text: 'RA-FS 2021:6',  updated_by: admin },
+    { node_id: ht1, property_definition_id: hBev,   value_text: 'Gallras',       updated_by: admin },
+    { node_id: ht1, property_definition_id: hDiar,  value_boolean: false,        updated_by: admin },
+    { node_id: ht2, property_definition_id: hBev,   value_text: 'Gallras',       updated_by: admin },
+    { node_id: ht2, property_definition_id: hDiar,  value_boolean: false,        updated_by: admin },
+  ]);
+
+  // A second process with the SAME codes HS / HT1 – allowed since migration 008 (unique per parent)
+  const k24 = await n({ structure_id: klass, parent_id: k2, node_type_id: process, reference_code: '1.2.4', title: 'Hantera kundfakturor',
+    sort_order: 1, is_published: true });
+  const hs24 = await n({ structure_id: klass, parent_id: k24, node_type_id: hslag, reference_code: 'HS', title: 'Handlingsslag', is_published: true });
+  const ht24 = await n({ structure_id: klass, parent_id: hs24, node_type_id: htyp, reference_code: 'HT1', title: 'Kundfaktura', is_published: true });
+  await knex('node_property_values').insert([
+    { node_id: ht24, property_definition_id: hSekr, value_text: 'OSL 21 kap. 1 §', updated_by: admin },
+    { node_id: ht24, property_definition_id: hBev,  value_text: 'Bevaras',         updated_by: admin },
+    { node_id: ht24, property_definition_id: hDiar, value_boolean: true,           updated_by: admin },
+  ]);
 
   // ---- Arkivförteckning tree ------------------------------------------------------
   const fakturor = await n({ structure_id: forteckning, node_type_id: serie, reference_code: 'F2', title: 'Fakturor', is_published: true,
@@ -157,6 +210,7 @@ exports.seed = async function (knex) {
   await knex('node_relations').insert([
     { relation_type_id: forvarasI, from_node_id: fakturor, to_node_id: kart12, created_by: admin },
     { relation_type_id: redovisas, from_node_id: fakturor, to_node_id: k23,    created_by: admin },
+    { relation_type_id: redovisas, from_node_id: fakturor, to_node_id: ht1,    created_by: admin },
   ]);
 
   // ---- Permissions (AD group names are placeholders) ------------------------------------
