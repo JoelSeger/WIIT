@@ -4,3 +4,7 @@ node_modules/
 .lock
 .idea/
 .angular/cache/
+
+# Cache-filer som orsakat merge-konflikter i frontend, bör ignoreras
+*.tsbuildinfo 
+vite/deps/
