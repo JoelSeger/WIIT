@@ -43,7 +43,7 @@ export abstract class BaseController {
     res.status(403).json({ error: message });
   }
 
-  protected success(res: Response, data: T, message?: string): void {
+  protected success<T>(res: Response, data: T, message?: string): void {
     res.json({ success: true, data, message });
   }
 

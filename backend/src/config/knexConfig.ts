@@ -1,7 +1,9 @@
 import 'dotenv/config';
 import type { Knex } from 'knex';
 
-const config: { [key: string]: Knex.Config } = {
+
+
+export const knexConfig: { [key: string]: Knex.Config } = {
   development: {
     client: 'mssql',
     connection: {
@@ -15,9 +17,11 @@ const config: { [key: string]: Knex.Config } = {
         trustServerCertificate: true,
       },
     },
+    pool: {
+      min: 2,
+      max: 10,
+    },
     migrations: { directory: './migrations' },
     seeds: { directory: './seeds' },
   },
 };
-
-export default config;

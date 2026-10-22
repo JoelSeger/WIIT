@@ -2,7 +2,8 @@
 import express, { Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
 import knex from 'knex';
-import knexConfig from '../knexfile';
+import knexConfig from './config/knexConfig';
+import { setRoutes } from './routes';
 
 dotenv.config();
 
@@ -18,13 +19,11 @@ const requireRole = () => async (req: Request, _res: Response, next: NextFunctio
   next();
 };
 
+setRoutes(app);
+
 // Ta bort kommentarer när export är portat :D
 // import { createEadExportRouter } from './ead/exportRoute';
 // app.use('/api', createEadExportRouter({ knex: db, requireRole }));
-
-app.get('/', (_req: Request, res: Response) => {
-  res.send('Servern körs!');
-});
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
