@@ -1,0 +1,68 @@
+// SCSS variables
+$menu-background: #ececec;
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  width: 350px;
+  min-height: 80vh;
+  background-color: $menu-background;
+
+  // Allows the user to resize the menu horizontally
+  resize: horizontal;
+  overflow: auto;
+  min-width: 200px;
+  max-width: 600px;
+
+  // Adjusts the menu when it is collapsed
+  &.closed {
+    width: 40px;
+    min-width: 40px;
+    resize: none;
+    overflow: hidden;
+
+  }
+
+  .menu-top {
+    display: flex;
+    justify-content: flex-end;
+    padding: 10px;
+  }
+
+  .menu-toggle {
+    border: none;
+    background-color: transparent;
+    cursor: pointer;
+    padding: 0;
+  
+
+    img {
+      width:10px;
+      height: 10px;
+      display: block;
+
+      // Rotates the arrow icon when the menu is closed
+      &.rotated {
+        transform: rotate(180deg);
+    }
+  }
+}
+
+.menu-content {
+    flex: 1;
+  }
+
+  .menu-bottom {
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    
+    img {
+        width: 20px;
+        height: 20px;
+        object-fit: contain;
+        
+    }
+  }
+}
