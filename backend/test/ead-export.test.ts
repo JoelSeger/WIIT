@@ -16,72 +16,11 @@ import { execFileSync } from 'node:child_process';
 import knexLib, { type Knex } from 'knex';
 import { loadStructure, type LoadedStructure, type LoadOptions } from '../src/ead/loadStructure';
 import { buildEad3 } from '../src/ead/buildEad3';
+import { createTables } from './sqliteSchema';
 
 // The seed is still JS – typed here until it is converted
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { seed } = require('../seeds/01_demo') as { seed: (knex: Knex) => Promise<void> };
-
-async function createTables(knex: Knex): Promise<void> {
-  const audit = (t: Knex.CreateTableBuilder): void => {
-    t.datetime('created_at'); t.integer('created_by'); t.datetime('updated_at'); t.integer('updated_by');
-  };
-  await knex.schema.createTable('users', (t) => {
-    t.increments('id'); t.string('ad_object_id'); t.string('username'); t.string('display_name');
-  });
-  await knex.schema.createTable('archive_creators', (t) => {
-    t.increments('id'); t.integer('parent_id'); t.string('creator_type').defaultTo('corporate'); t.string('name');
-    t.integer('start_year'); t.integer('end_year'); t.text('description'); t.string('external_id');
-    t.boolean('is_published').defaultTo(false); audit(t);
-  });
-  await knex.schema.createTable('archives', (t) => {
-    t.increments('id'); t.integer('archive_creator_id'); t.string('reference_code'); t.string('name');
-    t.integer('start_year'); t.integer('end_year'); t.text('description'); t.string('external_id');
-    t.boolean('is_published').defaultTo(false); audit(t);
-  });
-  await knex.schema.createTable('structures', (t) => {
-    t.increments('id'); t.string('code'); t.string('name'); t.string('structure_type'); t.text('description');
-    t.date('valid_from'); t.date('valid_to'); t.boolean('is_published').defaultTo(false);
-    t.string('agency_code'); t.string('agency_name'); t.string('language_code').defaultTo('swe'); t.string('license');
-    t.string('version'); t.integer('previous_structure_id'); audit(t);
-  });
-  await knex.schema.createTable('archive_structures', (t) => {
-    t.increments('id'); t.integer('archive_id'); t.integer('structure_id');
-    t.date('valid_from'); t.date('valid_to'); t.datetime('created_at'); t.integer('created_by');
-  });
-  await knex.schema.createTable('node_types', (t) => {
-    t.increments('id'); t.string('code'); t.string('name'); t.string('structure_type');
-    t.string('ead_level'); t.string('ead_otherlevel');
-  });
-  await knex.schema.createTable('node_type_rules', (t) => { t.integer('parent_type_id'); t.integer('child_type_id'); });
-  await knex.schema.createTable('nodes', (t) => {
-    t.increments('id'); t.integer('structure_id'); t.integer('parent_id'); t.integer('node_type_id');
-    t.string('reference_code'); t.string('previous_reference_code'); t.string('title');
-    t.integer('sort_order').defaultTo(0); t.boolean('is_published').defaultTo(false); t.string('external_id');
-    t.date('valid_from'); t.date('valid_to'); t.text('description'); t.string('portal_url'); audit(t);
-  });
-  await knex.schema.createTable('property_definitions', (t) => {
-    t.increments('id'); t.integer('node_type_id'); t.string('key'); t.string('label'); t.string('data_type');
-    t.boolean('is_public').defaultTo(true); t.string('ead_element'); t.text('help_text'); t.integer('sort_order').defaultTo(0);
-  });
-  await knex.schema.createTable('property_options', (t) => {          // migration 009
-    t.increments('id'); t.integer('property_definition_id'); t.string('value');
-    t.integer('sort_order').defaultTo(0); t.boolean('is_active').defaultTo(true);
-  });
-  await knex.schema.createTable('node_property_values', (t) => {
-    t.increments('id'); t.integer('node_id'); t.integer('property_definition_id'); t.text('value_text');
-    t.decimal('value_number'); t.date('value_date'); t.boolean('value_boolean'); t.integer('updated_by');
-  });
-  await knex.schema.createTable('relation_types', (t) => {
-    t.increments('id'); t.string('code'); t.string('name'); t.string('inverse_name'); t.string('ead_element');
-  });
-  await knex.schema.createTable('node_relations', (t) => {
-    t.increments('id'); t.integer('relation_type_id'); t.integer('from_node_id'); t.integer('to_node_id'); t.integer('created_by');
-  });
-  await knex.schema.createTable('ad_group_roles', (t) => { t.increments('id'); t.string('ad_group'); t.string('role'); t.integer('structure_id'); });
-  for (const name of ['change_log', 'structure_versions', 'transfer_jobs']) {
-    await knex.schema.createTable(name, (t) => { t.increments('id'); });
-  }
-}
 
 function validate(xml: string, name: string): void {
   const xsd = process.env.EAD3_XSD;
@@ -126,7 +65,8 @@ async function load(knex: Knex, id: number, opts?: LoadOptions): Promise<LoadedS
   assert.match(ihpXml, /<archdesc level="fonds">/);
   assert.match(ihpXml, /<unitid>MAU-001<\/unitid>/);
   assert.match(ihpXml, /<origination label="Arkivbildare">\s*<corpname>\s*<part>Malmö universitet<\/part>/);
-  assert.match(ihpXml, /<c level="class"/);
+  assert.match(ihpXml, /<c level="otherlevel" otherlevel="structuralunit"[^>]*>\s*<did>\s*<unitid>1<\/unitid>\s*<unittitle>Leda verksamhet<\/unittitle>\s*<didnote localtype="structuralunitdescription">Verksamhetsområde<\/didnote>/,
+    'structuralunit + didnote as in Klara (010)');
   assert.match(ihpXml, /<unitid>4.2.1<\/unitid>\s*<unittitle>Förbereda forskning och söka extern finansiering<\/unittitle>/);
   assert.match(ihpXml, /<odd localtype="ansvarig">/);
   validate(ihpXml, 'ihp.ead3.xml');
@@ -184,7 +124,7 @@ async function load(knex: Knex, id: number, opts?: LoadOptions): Promise<LoadedS
   const typeId = await idOf(knex, 'node_types', 'verksamhetsomrade');
   await knex('nodes').insert({ structure_id: loose, node_type_id: typeId, title: 'Ensam rot', is_published: true });
   const looseXml = buildEad3(await load(knex, loose), fixed);
-  assert.match(looseXml, /<archdesc level="class">/);
+  assert.match(looseXml, /<archdesc level="otherlevel" otherlevel="structuralunit">/);
   assert.doesNotMatch(looseXml, /origination/);
   validate(looseXml, 'los.ead3.xml');
   console.log('✓ structure without archive');

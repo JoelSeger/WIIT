@@ -91,13 +91,16 @@ exports.seed = async function (knex) {
   ]);
 
   // ---- Node types -------------------------------------------------------------
-  const t = (code, name, structure_type, ead_level, ead_otherlevel) =>
-    insert('node_types', { code, name, structure_type, ead_level, ead_otherlevel });
+  const t = (code, name, structure_type, ead_level, ead_otherlevel, ead_unit_description) =>
+    insert('node_types', { code, name, structure_type, ead_level, ead_otherlevel, ead_unit_description });
 
   // Struktur (RA-FS 2008:4 / FGS): verksamhetsområde → processgrupp → process → HS → HT
-  const omrade  = await t('verksamhetsomrade', 'Verksamhetsområde', 'klassificering', 'class');
-  const pgrupp  = await t('processgrupp',      'Processgrupp',      'klassificering', 'class');
-  const process = await t('process',           'Process',           'klassificering', 'class');
+  // Klara exports all three as otherlevel="structuralunit" and tells them apart with
+  // <didnote localtype="structuralunitdescription">, so the import can only find them this way.
+  const su = 'structuralunit';
+  const omrade  = await t('verksamhetsomrade', 'Verksamhetsområde', 'klassificering', 'otherlevel', su, 'Verksamhetsområde');
+  const pgrupp  = await t('processgrupp',      'Processgrupp',      'klassificering', 'otherlevel', su, 'Processgrupp');
+  const process = await t('process',           'Process',           'klassificering', 'otherlevel', su, 'Process');
   const hslag   = await t('handlingsslag',     'Handlingsslag',     'klassificering', 'otherlevel', 'recordgroup');
   const htyp    = await t('handlingstyp',      'Handlingstyp',      'klassificering', 'otherlevel', 'recordtype');
   // Förvaring – @otherlevel values as in Klara's export
@@ -209,6 +212,9 @@ exports.seed = async function (knex) {
   // ---- Relations between the trees ---------------------------------------------------
   await insert('relation_types', { code: 'forvaras_i', name: 'förvaras i', inverse_name: 'innehåller', ead_element: 'physloc' });
   const redovisas = await insert('relation_types', { code: 'redovisas_under', name: 'redovisas under', inverse_name: 'redovisar', ead_element: 'odd' });
+  // Klara's <unitid localtype="relations"><ref target="…">, e.g. handlingstyp → verksamhetssystem.
+  // The EAD import creates this type itself if a database has not been seeded.
+  await insert('relation_types', { code: 'relaterad_till', name: 'relaterad till', inverse_name: 'relaterad från', ead_element: 'relatedmaterial' });
   await knex('node_relations').insert([
     { relation_type_id: redovisas, from_node_id: svit1, to_node_id: ansokan, created_by: admin },
   ]);
