@@ -1,37 +1,11 @@
 import { Request, Response } from 'express';
-import { RequestContext } from '../services/request-context';
-import { User } from '../types/user';
+import { User } from '../models/user';
 
 
 /**
  * The base controller all other controllers should extend.
  */
 export abstract class BaseController {
-  constructor(protected requestContext: RequestContext) { };
-
-  protected get currentUser(): User | undefined {
-    const user = this.requestContext.user;
-    //TODO: ADD LOGGER HERE
-    return user;
-  }
-
-  protected requireAuth(): User {
-    return this.requestContext.requireAuth();
-  }
-
-  protected hasPrivilages(privilageGroups: string[] | undefined): boolean {
-    if (!privilageGroups || privilageGroups.length === 0) {
-      return false;
-    }
-
-    const user = this.currentUser;
-    if (!user) {
-      return false;
-    }
-
-    const userRoles = user.roles || [];
-    return privilageGroups.some(group => userRoles.includes(group))
-  }
 
   protected unauthorized(res: Response, message: string = "Unauthorized"): void {
     //TODO: ADD LOGGER HERE

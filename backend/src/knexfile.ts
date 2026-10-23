@@ -1,9 +1,7 @@
 import 'dotenv/config';
 import type { Knex } from 'knex';
 
-
-
-export const knexConfig: { [key: string]: Knex.Config } = {
+const config: { [key: string]: Knex.Config } = {
   development: {
     client: 'mssql',
     connection: {
@@ -25,3 +23,5 @@ export const knexConfig: { [key: string]: Knex.Config } = {
     seeds: { directory: './seeds' },
   },
 };
+
+export default config;
