@@ -5,7 +5,7 @@ import { createUserRouter } from './routers/userRoutes'; // Match your file name
 import { createIndexRouter } from './routers/indexRoutes';
 import { createEadExportRouter } from './ead/exportRoute';
 import { createEadImportRouter } from './ead/importRoute';
-
+import { requireRole } from './middleware/auth';
 
 dotenv.config();
 
