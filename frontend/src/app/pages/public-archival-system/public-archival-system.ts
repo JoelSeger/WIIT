@@ -1,9 +1,10 @@
 import { Component } from '@angular/core';
 
 @Component({
-  imports: [],
   selector: 'app-public-archival-system',
-  styleUrl: './public-archival-system.scss',
+  standalone: true,
+  imports: [],
   templateUrl: './public-archival-system.html',
+  styleUrl: './public-archival-system.scss'
 })
 export class PublicArchivalSystem {}
