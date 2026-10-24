@@ -7,8 +7,14 @@ export interface Structure {
   validFrom?: Date;
   validTo?: Date;
   isPublished: boolean;
-  version?: string;
+  createdAt: Date;
+  createdBy: number;
+  updatedAt?: Date;
+  updatedBy?: number;
   agencyCode?: string;
   agencyName?: string;
   languageCode: string;
+  license?: string;
+  version?: string;
+  previousStructureId?: number;
 }

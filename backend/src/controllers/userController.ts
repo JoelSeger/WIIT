@@ -12,11 +12,11 @@ export class UserController extends BaseController {
       const users = await this.userService.getAllUsers(100, 0);
 
       if (!users) {
-        res.status(404).json({ error: "Users not found" })
+        res.status(500).json({ error: "Users not found" })
         return;
       }
 
-      res.json(users);
+      res.status(200).json(users);
     } catch (error: any) {
       res.status(404).json({ error: error.message });
     }

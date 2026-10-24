@@ -7,5 +7,9 @@ export interface Archive {
   endYear?: number;
   description?: string;
   externalId?: string;
-  isPublished: boolean;
+  isPublished: boolean | null;
+  createdAt: Date;
+  createdBy: number;
+  updatedAt: Date;
+  updatedBy: number;
 }

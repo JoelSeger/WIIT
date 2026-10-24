@@ -11,9 +11,10 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+// TODO: Couple it with an actualy fetch of roles form the DB!
 export const requireRole = (...roles: string[]) =>
   (req: Request, res: Response, next: NextFunction) => {
-    const has = roles.some(r => req.user?.roles?.includes(r));
+    const has = roles.some(r => req.user?.ad_object_id?.includes(r));
     if (!has) return res.status(403).json({ error: 'Forbidden' });
     next();
   };
