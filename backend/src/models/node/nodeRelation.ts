@@ -1,16 +1,6 @@
 export interface NodeRelation {
   id: number;
-<<<<<<< Updated upstream
-  realtionTypeId: number;
-  fromNodeId: number;
-  toNodeId: number;
-  validFrom: Date;
-  validTo: Date;
-  note: string;
-  createdAt?: Date;
-  createdBy?: number;
-=======
-  relationTypeId: number;              // was realtionTypeId
+  relationTypeId: number;
   fromNodeId: number;
   toNodeId: number;
   validFrom: Date | null;
@@ -18,5 +8,4 @@ export interface NodeRelation {
   note: string | null;
   createdAt?: Date;
   createdBy?: number | null;
->>>>>>> Stashed changes
 }

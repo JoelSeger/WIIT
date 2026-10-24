@@ -26,7 +26,6 @@
     "fast-xml-parser": "^5.11.2",
     "knex": "^3.3.0",
     "knex-stringcase": "^1.6.0",
-    "list": "^2.0.19",
     "mssql": "^12.7.9",
     "multer": "^2.4.0",
     "tedious": "^20.3.7"
