@@ -1,11 +1,11 @@
 export interface NodeRelation {
   id: number;
-  realtionTypeId: number;
+  relationTypeId: number;
   fromNodeId: number;
   toNodeId: number;
-  validFrom: Date;
-  validTo: Date;
-  note: string;
+  validFrom: Date | null;
+  validTo: Date | null;
+  note: string | null;
   createdAt?: Date;
-  createdBy?: number;
+  createdBy?: number | null;
 }

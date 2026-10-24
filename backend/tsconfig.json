@@ -1,9 +1,9 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "rootDir": "./src",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "rootDir": ".",
     "outDir": "./dist",
     "strict": true,
     "esModuleInterop": true,
@@ -13,6 +13,7 @@
     "sourceMap": true,
     "declaration": false
   },
-  "include": ["src/**/*.ts", "src/types/.d.ts"],
+
+  "include": ["src/**/*.ts", "src/types/session.ts", "knexfile.ts"],
   "exclude": ["node_modules", "dist"]
 }

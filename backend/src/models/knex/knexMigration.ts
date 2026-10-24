@@ -1,4 +1,5 @@
-export interface KnexMigraiton {
+
+export interface KnexMigration {
   id: number;
   name: string;
   batch: number;

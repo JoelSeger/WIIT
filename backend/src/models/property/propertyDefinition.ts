@@ -3,11 +3,12 @@ export interface PropertyDefinition {
   nodeTypeId: number;
   key: string;
   label: string;
-  dataType: string;
+  dataType: 'text' | 'longtext' | 'number' | 'date' | 'boolean' | 'url' | 'enum';
   isRequired: boolean | null;
   isPublic: boolean | null;
-  eadElement: string;
-  helpText: string;
+  eadElement: string | null;
+  helpText: string | null;
   sortOrder: number;
   isActive: boolean | null;
+  isRepeatable: boolean | null;
 }

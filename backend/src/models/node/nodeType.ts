@@ -4,7 +4,8 @@ export interface NodeType {
   name: string;
   structureType: string;
   eadLevel: string;
-  eadOtherlevel?: string;
-  description?: string;
+  eadOtherlevel: string | null;
+  eadUnitDescription: string | null;
+  description: string | null;
   isActive: boolean | null;
 }

@@ -2,6 +2,6 @@ export interface AdGroupRole {
   id: number;
   adGroup: string;
   role: string;
-  structureId: number;
+  structureId: number | null;
   createdAt?: Date;
 }

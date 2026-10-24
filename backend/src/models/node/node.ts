@@ -1,21 +1,23 @@
 export interface Node {
   id: number;
   structureId: number;
-  parentId: number;
+  parentId: number | null;
   nodeTypeId: number;
-  referenceCode: string;
+  referenceCode: string | null;
+  previousReferenceCode: string | null;
   title: string;
   sortOrder: number;
   isPublished: boolean | null;
-  externalId?: string;
+  externalId: string | null;
   rowVersion?: Buffer;
+  validFrom: Date | null;
+  validTo: Date | null;
+  description: string | null;
+  portalUrl: string | null;
+  sourceUpdatedAt: Date | null;
+  sourceUpdatedBy: string | null;
   createdAt?: Date;
-  createdBy?: number;
+  createdBy?: number | null;
   updatedAt?: Date;
-  updatedBy?: number;
-  validFrom?: Date;
-  validTo?: Date;
-  description?: string;
-  portalUrl?: string;
-  previousReferenceCode?: string;
+  updatedBy?: number | null;
 }

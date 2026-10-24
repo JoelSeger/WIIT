@@ -29,12 +29,14 @@ export abstract class CrudRepository<T> implements Reader<T>, Writer<T> {
   }
 
   async findAll(limit: number = 100, offset: number = 0): Promise<T[]> {
-    return await this.qb.select().limit(limit).offset(offset);
+    return this.qb.select().limit(limit).offset(offset);
   }
 
   async findOne(id: string | Partial<T>): Promise<T> {
-    const query = typeof id === 'string' ? { id } : id;
-    return this.qb.where(query).first();
+    type Id = number | string;
+    const asWhere = <T>(id: Id | Partial<T>): object =>
+      typeof id === 'object' ? id : { id };
+    return this.qb.where(asWhere).first();
   }
 
   async exists(id: string | Partial<T>): Promise<boolean> {
