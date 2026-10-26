@@ -4,7 +4,7 @@ import session from 'express-session';
 import { db, dbRaw } from './config/db';
 import { attachUser, requireRole } from './middleware/auth';
 import { createUserRouter } from './routers/userRoutes';
-import { createIndexRouter } from './routers/indexRoutes';
+import { Index } from './routes';
 import { createEadExportRouter } from './ead/exportRoute';
 import { createEadImportRouter } from './ead/importRoute';
 
@@ -20,12 +20,11 @@ app.use(session({
 }));
 app.use(attachUser);
 
-app.use('/', createIndexRouter());
+new Index(db).setRoutes(app);
 app.use('/mau-arkiv/users', createUserRouter(db));
 app.use('/api', createEadExportRouter({ knex: dbRaw, requireRole }));
 app.use('/api', createEadImportRouter({ knex: dbRaw, requireRole }));
 
-// Routes call next(err) (multer, import errors), so something has to answer
 app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
   res.status(err.status ?? 500).json({ success: false, error: err.message });
