@@ -1,24 +1,28 @@
 // SCSS variables
 $menu-background: #ececec;
+$menu-min-width: 200px;
+$menu-max-width: 600px;
+$menu-closed-width: 40px;
+$resize-handle-width: 10px;
 
 .menu {
   display: flex;
   flex-direction: column;
   width: 350px;
+  min-width: $menu-min-width;
+  max-width: $menu-max-width;
   min-height: 80vh;
   background-color: $menu-background;
+  flex-shrink: 0;
+  position: relative;
+  box-sizing: border-box;
 
-  // Allows the user to resize the menu horizontally
-  resize: horizontal;
-  overflow: auto;
-  min-width: 200px;
-  max-width: 600px;
 
   // Adjusts the menu when it is collapsed
   &.closed {
-    width: 40px;
-    min-width: 40px;
-    resize: none;
+    width: $menu-closed-width;
+    min-width: $menu-closed-width;
+    max-width: $menu-closed-width;
     overflow: hidden;
 
   }
@@ -64,5 +68,15 @@ $menu-background: #ececec;
         object-fit: contain;
         
     }
+  }
+.resize-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: $resize-handle-width;
+    height: 100%;
+    cursor: col-resize;
+    user-select: none;
+    z-index: 10;
   }
 }
