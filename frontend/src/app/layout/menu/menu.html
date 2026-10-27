@@ -1,4 +1,10 @@
-<aside class="menu" [class.closed]="!isOpen">
+<aside 
+#menuContainer 
+class="menu" 
+[class.closed]="!isOpen"
+[style.width.px]="isOpen ? menuWidth : 40"
+>
+
 
   <div class="menu-top">
     <button 
@@ -26,5 +32,7 @@
     <img src="/settings.png" alt="" />
     <span>Inställningar</span>
   </div>
+
+  <div class="resize-handle" (mousedown)="startResize($event)"></div>
 }
 </aside>
