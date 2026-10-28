@@ -6,6 +6,7 @@ export interface NodePropertyValues {
   valueNumber?: number;
   valueDate?: Date;
   valueBoolean: boolean | null;
+  valueOrder: number;
   updatedAt?: Date;
   updatedBy?: number;
 }
