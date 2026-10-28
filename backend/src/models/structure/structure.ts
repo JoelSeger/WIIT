@@ -1,20 +1,17 @@
+
 export interface Structure {
   id: number;
   code: string;
   name: string;
-  structureType: string;
-  description?: string;
-  validFrom?: Date;
-  validTo?: Date;
-  isPublished: boolean;
-  createdAt: Date;
-  createdBy: number;
-  updatedAt?: Date;
-  updatedBy?: number;
-  agencyCode?: string;
-  agencyName?: string;
-  languageCode: string;
-  license?: string;
-  version?: string;
-  previousStructureId?: number;
+  structure_type: "klassificering" | "arkivforteckning" | "forvaring";
+  description?: string | null;
+  valid_from?: Date | null;
+  valid_to?: Date | null;
+  is_published: boolean;
+  version?: string | null;
+  previous_structure_id?: number | null;
+  created_at?: Date;
+  created_by?: number | null;
+  updated_at?: Date;
+  updated_by?: number | null;
 }
