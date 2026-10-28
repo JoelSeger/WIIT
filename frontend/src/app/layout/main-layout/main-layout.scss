@@ -1,0 +1,33 @@
+:host {
+    display: block;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.app-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+app-header, app-nav {
+    flex-shrink: 0;
+}
+
+.app-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+app-menu {
+    height: 100%;
+    display: flex;
+}
+
+.app-content {
+    flex: 1;
+    padding: 1.5rem;
+    overflow-y: auto;
+    background-color: #ffffff;
+}

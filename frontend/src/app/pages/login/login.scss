@@ -3,43 +3,60 @@
 :host {
     display: block;
     min-height: 100vh;
-    --mau-red: E4022D; 
+
+    --mau-red: #E4022D; 
     --text-primary: #000000;
-    --border-color:E4022D;
-    --surface: rgba(255, 255, 255, 0.95);
+    --border-color: #d0d0d0;
+    --error-color: #b31c1c;
+    --surface: #ffffff;
+    --button-background: #2c2c2c;
 }
 
 .login-page {
+    box-sizing: border-box;
     min-height: 100vh;
     display: flex;
     justify-content: center;
     align-items: flex-start;
     padding: 10vh 24px 48px;
 
-    // Background of Malmö University
-    background: 
+    // Background of Malmö University, Niagara
+    background-image: 
         linear-gradient(
-            rgba(255, 255, 255, 0.7),
-            rgba(255, 255, 255, 0.7)
+            rgba(255, 255, 255, 0.9),
+            rgba(255, 255, 255, 0.9)
         ),
-        url('/images/mau-background.svg') no-repeat center center;
+        url('/images/mau-background.svg');
+
+    background-repeat: no-repeat;
+    background-position: center center;
+    background-size: cover;
 }
 
 .login-container {
+    box-sizing: border-box;
     width: 100%;
     max-width: 400px;
     text-align: center;
-    background: #ffffff;
-    padding: 20px 20px;
-    border-radius: 10px;
-    
+    background: transparent;
 }
 
 .mau-logo {
     display: block;
     width: 250px;
+    max-width: 100%;
     height: auto;
     margin: 0 auto 48px;
+}
+
+.login-form {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 24px;
+    background-color: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    text-align: left;
 }
 
 .form-content {
@@ -49,27 +66,72 @@
     label {
         display: block;
         margin-bottom: 8px;
-        font-weight: bold;
+        font-weight: 600px;
         color: var(--text-primary);
     }
 
     input {
+        display: block;
+        box-sizing: border-box;
         width: 100%;
         padding: 14px;
-        border: 1px solid var(--border-color);
+        font: inherit;
+        color: var(--text-primary);
+        border: 1px solid var(--mau-red);
         border-radius: 4px;
         background: var(--surface);
+
+        &:focus-visible {
+            outline: 2px solid var(--mau-red);
+            outline-offset: 2px;
+            border-color: var(--mau-red);
+        }
     }
 }
 
-button {
+button [type="submit"] {
     display: block;
-    width: 80%;
+    box-sizing: border-box;
+    width: 100%;
+    margin: 8px auto 0;
+    padding: 12px 16px;
     font-size: 16px;
     font-weight: 600;
+
+    color: #ffffff;
+    background: var(--mau-red);
+    border: 1px solid var(--mau-red);
+    border-radius: 4px;
+
     cursor: pointer;
+    transition: background-color 0.2s ease;
 
     &:hover:not(:disabled) {
-        background: var(--mau-red);
+        background: #b90124;
+        border-color: #b90124;
     }
+
+    &:focus-visible {
+        outline: 2px solid #000000;
+        outline-offset: 3px;
+    }
+
+    &:disabled {
+        color: #ffffff;
+        background-color: #b90124;
+        border-color: #b90124;
+        opacity: 1;
+        cursor: not-allowed;
+    }
+}
+
+.error-message,
+.login-error {
+    margin-top: 6px;
+    color: var(--error-color);
+    font-size: 0.875rem;
+}
+
+.login-error {
+    text-align: left;
 }
