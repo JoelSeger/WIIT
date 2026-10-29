@@ -1,0 +1,71 @@
+$bg-color: #f7f7f9;
+$text-color: #222222;
+$card-bg: #ffffff;
+$accent-red: #e02444;
+$border-color: #d1d1d1;
+$shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.05);
+$shadow-md: 0 4px 15px rgba(0, 0, 0, 0.1);
+
+.page {
+    background-color: $bg-color;
+    min-height: 100vh;
+    font-family: 'Segoe UI', Roboto, Arial, Helvetica, sans-serif;
+    color: $text-color;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 60px 20px;
+}
+
+.page-title {
+    margin-bottom: 80px;
+    text-align: center;
+
+    h2 {
+        font-size: 32px;
+        font-weight: 600;
+        margin: 0;
+        
+    }
+}
+
+.archive-content {
+    width: 100%;
+    max-width: 800px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 40px;
+}
+
+.archive-cards {
+    display: flex;
+    gap: 48px;
+    width: 100%;
+    justify-content: center;
+    
+    flex-wrap: wrap; 
+
+    button {
+        flex: 1;
+        min-width: 250px;
+        max-width: 320px;
+        background-color: $card-bg;
+        border: 1px solid #eaeaea;
+        border-radius: 8px;
+        padding: 40px 20px;
+        font-size: 18px;
+        font-weight: 500;
+        color: $text-color;
+        cursor: pointer;
+        
+        box-shadow: $shadow-md; 
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+        &:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+            background-color: #fafafa;
+        }
+    }
+}
