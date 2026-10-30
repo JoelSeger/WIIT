@@ -21,8 +21,8 @@ $profile-size: 24px;
     gap: 0.75rem;
 
     .logo {
-      width: $logo-size;
-      height: $logo-size;
+      width: auto;
+      height: 45px;
       object-fit: contain;
       display: block;
     }

@@ -5,24 +5,27 @@
       [alt]="logoAlt"
       class="logo"
     />
-
-    <span class="university-name">Malmö Universitet</span>
   </div>
 
   <div class="header-user">
-    <span class="user-label">{{ userLabel }}</span>
+    @if (loginService.currentUser()) {
+      <span class="user-label">{{ loginService.currentUser() }}</span>
 
-    <button
-      class="user-button"
-      type="button"
-      (click)="openProfile()"
-      aria-label="Användarprofil"
-    >
-      <img
-        [src]="profileIconUrl"
-        alt=""
-        class="profile-icon"
-      />
-    </button>
+      <!-- "Inloggat" läge "-->
+      <button
+        class="user-button"
+        type="button"
+        (click)="loginService.logout()" 
+        aria-label="Logga ut">
+      </button>
+
+      <!-- Besöksläge -->
+      }  @else {
+          <a routerLink="/login"
+            class="user-button"
+            aria-label="Logga in">
+            <img [src]="profileIconUrl" alt="Logga in" class="profile-icon" />
+          </a>
+          }
   </div>
 </header>

@@ -66,7 +66,7 @@
     label {
         display: block;
         margin-bottom: 8px;
-        font-weight: 600px;
+        font-weight: 600;
         color: var(--text-primary);
     }
 
@@ -89,14 +89,14 @@
     }
 }
 
-button [type="submit"] {
+.login-btn {
     display: block;
     box-sizing: border-box;
     width: 100%;
-    margin: 8px auto 0;
-    padding: 12px 16px;
+    margin: 24px auto 0;
+    padding: 14px 16px;
     font-size: 16px;
-    font-weight: 600;
+    font-weight: 300;
 
     color: #ffffff;
     background: var(--mau-red);
@@ -104,7 +104,7 @@ button [type="submit"] {
     border-radius: 4px;
 
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    transition: background-color 0.4s ease;
 
     &:hover:not(:disabled) {
         background: #b90124;
@@ -118,8 +118,8 @@ button [type="submit"] {
 
     &:disabled {
         color: #ffffff;
-        background-color: #b90124;
-        border-color: #b90124;
+        background-color: #d1d1d1;
+        border-color: #d1d1d1;
         opacity: 1;
         cursor: not-allowed;
     }

@@ -1,22 +1,19 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { LoginService } from '../../core/services/login.service';
 
 @Component({
-  imports: [],
   selector: 'app-header',
+  standalone: true,
+  imports: [RouterLink],
   styleUrl: './header.scss',
   templateUrl: './header.html',
 })
 export class Header {
-  logoUrl: string = '/mau-logo.png';
+  loginService = inject(LoginService)
+
+  logoUrl: string = '/MAU-HeaderLogo.png';
   logoAlt: string = 'Malmö universitets logotyp';
-
-  userLabel: string = 'ANVÄNDARE';
   profileIconUrl: string = '/user-profile.png';
-
-  // Placeholder function until the profile functionality is implemented
-  openProfile(): void {
-    console.log('Profile button clicked');
-  }
+  loginIconUrl: string ='/login-icon.png';
 }
-
-

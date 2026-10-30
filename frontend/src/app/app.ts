@@ -7,7 +7,8 @@ import { Menu } from './layout/menu/menu';
 
 
 @Component({
-  imports: [RouterOutlet, Header, Nav, Menu, Settings],
+  standalone: true,
+  imports: [RouterOutlet],
   selector: 'app-root',
   styleUrl: './app.scss',
   templateUrl: './app.html',

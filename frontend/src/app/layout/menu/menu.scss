@@ -60,14 +60,21 @@ $resize-handle-width: 10px;
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
     
     img {
         width: 20px;
         height: 20px;
         object-fit: contain;
-        
+    }
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.05)
     }
   }
+
 .resize-handle {
     position: absolute;
     top: 0;
