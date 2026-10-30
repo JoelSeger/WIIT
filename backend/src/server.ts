@@ -8,6 +8,8 @@ import { createIndexRouter } from './routers/indexRoutes';
 import { createEadExportRouter } from './ead/exportRoute';
 import { createEadImportRouter } from './ead/importRoute';
 import { createStructureCreationRoutes } from "../src/routers/structureCreationRoute";
+import { createNodeRouter } from "../src/routers/nodeRoute";
+
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -25,7 +27,7 @@ app.use('/mau-arkiv/users', createUserRouter(db));
 app.use('/api', createEadExportRouter({ knex: dbRaw, requireRole }));
 app.use('/api', createEadImportRouter({ knex: dbRaw, requireRole }));
 app.use("/api/structures", createStructureCreationRoutes(db));
-
+app.use("/api/nodes", createNodeRouter(db));
 // Routes call next(err) (multer, import errors), so something has to answer
 app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
