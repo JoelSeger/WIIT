@@ -1,51 +1,42 @@
 import type { Request, Response } from 'express';
 import { BaseController } from './baseController';
 import type { RequestContext } from '../types/requestContext';
-import { findNode, nodeChangeAction, recordNodeChange, toTree, validId, type NodeRow } from './nodeApiSupport';
+import { validId } from './nodeApiSupport';
+import type { NodeRow } from '../models/node/nodeRow';
+import type { NodeService } from '../services/nodeService';
 
 const EDIT_GROUPS = ['administrator', 'hasPermissions'];
 
+/** Translate archive, series, and volume HTTP requests into service workflows and HTTP responses. */
 export class ArchiveController extends BaseController {
 
-  /* this passes the current request context to shared controller helpers so archive operations can access the session user and database. */
-  constructor(context: RequestContext) { super(context); }
+  /** BaseController provides the current user; NodeService handles archive rules and repository workflows. */
+  constructor(context: RequestContext, private readonly nodeService: NodeService) { super(context); }
 
 
-  /* This loads each archive and its linked structures, then loads and nests each structure's nodes for tree display.
-  The response includes archive-to-structure validity dates; publication filtering is still a required decision. */
+  /** Return archives with linked structures and nested nodes. The current endpoint returns the full tree;
+   * whether it should apply publication filtering is still a product decision. */
 
   getTree = async (_req: Request, res: Response): Promise<void> => {
     try {
-      const archives = await this.db('archives').select('*');
-      const output = [];
-      for (const archive of archives) {
-        const linkedStructures = await this.db('archive_structures as ast')
-          .join('structures as s', 's.id', 'ast.structure_id')
-          .where('ast.archive_id', archive.id)
-          .select('s.*', 'ast.valid_from as archive_valid_from', 'ast.valid_to as archive_valid_to');
-        const structures = [];
-        for (const structure of linkedStructures) {
-          const nodes = await this.db<NodeRow>('nodes').where({ structure_id: structure.id }).select('*');
-          structures.push({ structure, nodes: toTree(nodes) });
-        }
-        output.push({ ...archive, structures });
-      }
-      // TODO!!!: We have to apply the public visibility rules for archives, structures, nodes.
+      const output = await this.nodeService.archiveTree();
       res.json(output);
     } catch (error) {
       this.error(res, error instanceof Error ? error.message : 'Could not load archive tree.');
     }
   };
 
-  /* This creates a series node under an existing parent in an archive-linked inventory structure.
-  It checks editor/admin permissions, the archive/structure/type selection, the parent-child type rules and
-  a not empty name. Then it inserts the node and the audit log entry all at once. */
+  /** Create a series beneath a parent in an archive-linked inventory structure. The service resolves structure/type
+   * rules and the repository saves the node with its audit record. This currently identifies a series by EAD level
+   * 'series'; confirm that this matches the customer's configured node types. */
 
   createSeries = async (req: Request, res: Response): Promise<void> => {
     if (!this.requireEditor(res)) return;
     const archiveId = validId(req.params.archiveId);
     if (archiveId === null) { this.error(res, 'archiveId must be a positive integer.', 400); return; }
-    const { archive, structure, error } = await this.archiveStructure(archiveId, req.body?.structureId);
+    const requestedStructureId = req.body?.structureId == null ? undefined : validId(String(req.body.structureId));
+    if (req.body?.structureId != null && !requestedStructureId) { this.error(res, 'structureId must be a positive integer.', 400); return; }
+    const { archive, structure, error } = await this.archiveStructure(archiveId, requestedStructureId);
     if (error) { this.error(res, error.message, error.status); return; }
     if (!archive || !structure){ this.error(res, 'Archive or archival inventory structure not found.', 404); return;}
 
@@ -57,7 +48,7 @@ export class ArchiveController extends BaseController {
     }
     const parent = await this.requiredParent(req.body?.parentId, structure.id, res);
     if (parent === false) return;
-    if (!(await this.isAllowedChild(parent.node_type_id, typeId))){
+    if (!(await this.isAllowedChild(parent.nodeTypeId, typeId))){
       this.error(res, 'This node type is not allowed under the selected parent.', 400); return;
     }
     const fields = nodeFields(req.body);
@@ -66,18 +57,9 @@ export class ArchiveController extends BaseController {
       this.error(res, 'name/title is required to create a series.', 400); return;
     }
     try{
-      const sortOrder = fields.values.sort_order ?? await this.nextSortOrder(structure.id, parent.id);
-      const created = await this.db.transaction(async (trx) => {
-        const [node] = await trx('nodes').insert({
-          structure_id: structure.id, parent_id: parent.id, node_type_id: typeId, ...fields.values, sort_order: sortOrder,
-          created_by: this.requestContext.user?.id ?? null, updated_by: this.requestContext.user?.id ?? null,
-        }).returning('*');
-        await recordNodeChange(trx, {
-          id: node.id, structureId: structure.id, action: 'create', newValue: node,
-          changedBy: this.requestContext.user?.id ?? null,});
-
-        return node;
-      });
+      const sortOrder = fields.values.sortOrder ?? await this.nextSortOrder(structure.id, parent.id);
+      const created = await this.nodeService.create({ structureId: structure.id, parentId: parent.id,
+        nodeTypeId: typeId, ...fields.values, sortOrder }, structure.id, this.requestContext.user?.id ?? null);
       res.status(201).json(created);
 
     } catch (error) {
@@ -86,8 +68,7 @@ export class ArchiveController extends BaseController {
   };
 
 
-  /* This Confirms the series belongs to the URL's archive and delegates its single-node deletion to
-  a shared transaction helper. checks for authorization (that we still need to implement) before any lookup or change. */
+  /** Confirm archive membership, then delete the series through the shared audited delete workflow. */
 
   deleteSeries = async (req: Request, res: Response): Promise<void> => {
     if(!this.requireEditor(res)) return;
@@ -100,8 +81,7 @@ export class ArchiveController extends BaseController {
   };
 
 
-  /* This Verifies the series/archive relationship, maps any supported body fields to the database columns,
-  row and audit log are updated; it finally returns the updated node. */
+  /** Verify the series belongs to this archive, map supplied fields, and return the saved node. */
 
   updateSeries = async (req: Request, res: Response): Promise<void> => {
     if (!this.requireEditor(res)) return;
@@ -114,30 +94,15 @@ export class ArchiveController extends BaseController {
     if (fields.error) { this.error(res, fields.error, 400); return; }
     if (!Object.keys(fields.values).length) { this.error(res, 'No supported node fields were supplied.', 400); return; }
     try {
-      const updated = await this.db.transaction(async (trx) => {
-        await trx('nodes').where({ id: seriesId }).update({
-          ...fields.values, updated_at: trx.fn.now(), updated_by: this.requestContext.user?.id ?? null,
-        });
-        const current = await trx<NodeRow>('nodes').where({ id: seriesId }).first();
-        if (current) {
-          await recordNodeChange(trx, {
-            id: seriesId, structureId: series.structure_id, action: nodeChangeAction(series, fields.values), oldValue: series, newValue: current,
-            changedBy: this.requestContext.user?.id ?? null,
-          });
-        }
-        return current;
-      });
+      const updated = await this.nodeService.update(seriesId, series.structureId, fields.values, this.requestContext.user?.id ?? null, series);
       res.json(updated);
     } catch (error) {
       this.error(res, error instanceof Error ? error.message : 'Could not update series.', 409);
     }
   };
 
-  /* This finds all the direct child nodes of a series and returns them in correct display order with the node-type names.
-  At present, this treats every direct child as a volume because there is no volume-type filter of any kind.
-  Basically the code returns every node whose parent_id is that series,but it does not check whether each child’s type is actually “volume.”
-  This comes from uncertainty in the project’s node-type mapping: until we define which type or types count as volumes,
-  the route will return other kinds of children too. I might be totally confused here!!!*/
+  /** List direct children of a series in display order and include each child's type name.
+   * This assumes every direct child is a volume; confirm whether the frontend needs a type filter. */
 
   getVolumes = async (req: Request, res: Response): Promise<void> => {
     const archiveId = validId(req.params.archiveId);
@@ -147,15 +112,7 @@ export class ArchiveController extends BaseController {
     if (!series) { this.error(res, 'Series not found for this archive.', 404); return; }
     try {
 
-    /*Here a series' volumes are direct child nodes.
-     Their actual type names come from node_types; a series can contain non-volume children, might need to add a volume-type
-     rule here instead of treating every child as a volume.*/
-
-      const volumes = await this.db('nodes as n')
-        .join('node_types as nt', 'nt.id', 'n.node_type_id')
-        .where('n.parent_id', seriesId)
-        .orderBy([{ column: 'n.sort_order' }, { column: 'n.id' }])
-        .select('n.*', 'nt.code as node_type_code', 'nt.name as node_type_name');
+      const volumes = await this.nodeService.volumes(seriesId);
       res.json(volumes);
     } catch (error) {
       this.error(res, error instanceof Error ? error.message : 'Could not load volumes.');
@@ -163,8 +120,8 @@ export class ArchiveController extends BaseController {
   };
 
 
-  /* This creates a volume as a direct child of the specified series. It requires editor/admin access and a name,
-  determines the allowed child type from the node-type rules, then saves the node and the audit log entry in one go. */
+  /** Create a child under a series. Allowed child types come from node_type_rules; when several are configured,
+   * the caller must send nodeTypeId. Confirm that these configured child types are the intended volumes. */
 
   createVolume = async (req: Request, res: Response): Promise<void> => {
     if (!this.requireEditor(res)) return;
@@ -173,7 +130,7 @@ export class ArchiveController extends BaseController {
     if(archiveId === null || seriesId === null){ this.error(res, 'Archive and series IDs must be positive integers.', 400); return; }
     const series = await this.findSeries(archiveId, seriesId);
     if (!series) { this.error(res, 'Series not found for this archive.', 404); return; }
-    const typeId = await this.resolveVolumeType(series.node_type_id, req.body?.nodeTypeId);
+    const typeId = await this.resolveVolumeType(series.nodeTypeId, req.body?.nodeTypeId);
 
     if (!typeId){
       this.error(res, 'Could not determine the volume node type. Supply nodeTypeId if the series allows multiple child types.', 400);
@@ -185,17 +142,9 @@ export class ArchiveController extends BaseController {
       this.error(res, 'A non-empty name/title is required to create a volume.', 400); return;
     }
     try {
-      const sortOrder = fields.values.sort_order ?? await this.nextSortOrder(series.structure_id, seriesId);
-      const created = await this.db.transaction(async (trx) => {
-        const [node] = await trx('nodes').insert({
-          structure_id: series.structure_id, parent_id: seriesId, node_type_id: typeId, ...fields.values, sort_order: sortOrder,
-          created_by: this.requestContext.user?.id ?? null, updated_by: this.requestContext.user?.id ?? null,
-        }).returning('*');
-        await recordNodeChange(trx, {
-          id: node.id, structureId: series.structure_id, action: 'create', newValue: node,
-          changedBy: this.requestContext.user?.id ?? null, });
-        return node;
-      });
+      const sortOrder = fields.values.sortOrder ?? await this.nextSortOrder(series.structureId, seriesId);
+      const created = await this.nodeService.create({ structureId: series.structureId, parentId: seriesId,
+        nodeTypeId: typeId, ...fields.values, sortOrder }, series.structureId, this.requestContext.user?.id ?? null);
       res.status(201).json(created);
 
     } catch (error) {
@@ -204,34 +153,31 @@ export class ArchiveController extends BaseController {
   };
 
 
-  /* This verifies that the volume ID is a child of a series in the archive that is named in the request body,
-  then it updates the node fields and records the change in one transaction. */
+  /** Update a volume after checking that its parent series belongs to body.archiveId. The archive ID is currently
+   * required in the body; moving it into the path would require a separate frontend/API contract change. */
 
   updateVolume = async (req: Request, res: Response): Promise<void> => {
+
     if (!this.requireEditor(res)) return;
     const volumeId = validId(req.params.volumeId);
-    if (volumeId === null) { this.error(res, 'volumeId must be a positive integer.', 400); return; }
+
+    if (volumeId === null) {this.error(res, 'volumeId must be a positive integer.', 400); return; }
     const archiveId = req.body?.archiveId == null ? null : validId(String(req.body.archiveId));
-    if (archiveId === null) { this.error(res, 'archiveId must be supplied as a positive integer.', 400); return; }
+
+    if (archiveId === null) {this.error(res, 'archiveId must be supplied as a positive integer.', 400); return; }
     const volume = await this.findVolume(volumeId, archiveId);
-    if (!volume) { this.error(res, 'Volume not found.', 404); return; }
+
+    if (!volume){this.error(res, 'Volume not found.', 404); return; }
     const fields = nodeFields(req.body);
-    if (fields.error) { this.error(res, fields.error, 400); return; }
-    if (!Object.keys(fields.values).length) { this.error(res, 'No supported node fields were supplied.', 400); return; }
+
+    if(fields.error) {this.error(res, fields.error, 400); return; }
+
+    if(!Object.keys(fields.values).length) {
+      this.error(res, 'No supported node fields were supplied.', 400); return; }
+
     try {
-      const updated = await this.db.transaction(async (trx) => {
-        await trx('nodes').where({ id: volumeId }).update({
-          ...fields.values, updated_at: trx.fn.now(), updated_by: this.requestContext.user?.id ?? null,
-        });
-        const current = await trx<NodeRow>('nodes').where({ id: volumeId }).first();
-        if (current) {
-          await recordNodeChange(trx, {
-            id: volumeId, structureId: volume.structure_id, action: nodeChangeAction(volume, fields.values), oldValue: volume, newValue: current,
-            changedBy: this.requestContext.user?.id ?? null,
-          });
-        }
-        return current;
-      });
+      const updated = await this.nodeService.update(volumeId, volume.structureId,
+          fields.values, this.requestContext.user?.id ?? null, volume);
       res.json(updated);
     } catch (error) {
       this.error(res, error instanceof Error ? error.message : 'Could not update volume.', 409);
@@ -239,216 +185,171 @@ export class ArchiveController extends BaseController {
   };
 
 
-  /* This confirms that the target is a volume under a series,and it then removes that node through the shared delete helper that is audit-logged
-  The child rows, if present, prevent the deletion through the database constraint. (The NO ACTION foreign key on nodes.parent_id)*/
+
+  /** Delete a volume beneath a series. The shared workflow audits the deletion and removes relations;
+   * the database prevents deletion if the node still has children. */
 
   deleteVolume = async (req: Request, res: Response): Promise<void> => {
-    if (!this.requireEditor(res)) return;
+    if(!this.requireEditor(res)) return;
     const volumeId = validId(req.params.volumeId);
-    if (volumeId === null) { this.error(res, 'volumeId must be a positive integer.', 400); return; }
+    if(volumeId === null) { this.error(res, 'volumeId must be a positive integer.', 400); return; }
     const volume = await this.findVolume(volumeId);
     if (!volume) { this.error(res, 'Volume not found.', 404); return; }
     await this.deleteNodeAndRelations(volumeId, res);
+
   };
 
-  /* This returns true only when the request has a session user with editing permissions.
-  It sends 401 or 403 when access fails. */
+
+  /** Stop the request with codes 401 or 403 unless the session user has one of the configured permissions. */
 
   private requireEditor(res: Response): boolean {
-    if (!this.isAuthenticated()) { this.unauthorized(res); return false; }
-    if (!this.isUserPrivilegeGroup(EDIT_GROUPS)) {
-      this.forbidden(res, 'Editing nodes requires administrator or hasPermissions.'); return false;
+    if (!this.isAuthenticated()) {
+      this.unauthorized(res);
+      return false; }
+    if (!this.isUserPrivilegeGroup(EDIT_GROUPS)){
+      this.forbidden(res, 'Editing nodes requires administrator or hasPermissions.');
+      return false;
     }
     return true;
   }
 
-  /* Join for the node to its type, structure and archive link to ensure the requested node is the expected kind of series
-  belonging to that archive. */
 
-  private async findSeries(archiveId: number, seriesId: number): Promise<NodeRow | undefined> {
+  /** Read a series only when it belongs to the archive named in the URL. */
 
- /*
-The code identifies a series by checking that its node type has EAD level series. If the series is represented
-using EAD’s otherlevel, this lookup won’t find it; I mean that the rule that tells the code which database node type represents a series
-(EAD level is 'series' vs. identified by some "otherlevel" value). The requirements describe series conceptually but not which database value
-identifies it. Otherwise, the query would need to check the node-type instead (?)
+  getSeries = async (req: Request, res: Response): Promise<void> => {
+    const archiveId = validId(req.params.archiveId);
+    const seriesId = validId(req.params.seriesId);
+    if (archiveId === null || seriesId === null) { this.error(res, 'Archive and series IDs must be positive integers.', 400); return; }
 
-*/
-    return this.db<NodeRow>('nodes as n')
-      .join('node_types as nt', 'nt.id', 'n.node_type_id')
-      .join('structures as s', 's.id', 'n.structure_id')
-      .join('archive_structures as ast', 'ast.structure_id', 's.id')
-      .where({ 'n.id': seriesId, 'ast.archive_id': archiveId, 's.structure_type': 'arkivforteckning', 'nt.ead_level': 'series' })
-      .select('n.*').first();
+    try {
+      const node = await this.findSeries(archiveId, seriesId);
+      if (!node) { this.error(res, 'Series not found for this archive.', 404); return; }
+      res.json(node);
+    } catch (error) {
+      this.error(res, error instanceof Error ? error.message : 'Could not load series.');
+    }
+  };
+
+
+  /** Find the target node and enforce the current archive/series definition. The service/repository currently use
+   * EAD level "series"; if customer-defined series use otherlevel, adjust that rule there. */
+  private async findSeries(archiveId: number, seriesId: number): Promise<NodeRow |undefined> {
+    return this.nodeService.series(archiveId, seriesId);
   }
 
 
-  /* this identifies a volume by checking that its parent is a series in an archival inventory structure;
-  when an archive ID is supplied, it also verifies the archive link. */
+  /** Find a node whose parent is a series in an inventory structure, optionally checking its archive link. */
 
   private async findVolume(volumeId: number, archiveId?: number): Promise<NodeRow | undefined> {
-    return this.db<NodeRow>('nodes as v')
-      .join('nodes as p', 'p.id', 'v.parent_id')
-      .join('node_types as pt', 'pt.id', 'p.node_type_id')
-      .join('structures as s', 's.id', 'v.structure_id')
-      .modify((query) => {
-        query.where({ 'v.id': volumeId, 's.structure_type': 'arkivforteckning', 'pt.ead_level': 'series' });
-        if (archiveId !== undefined) query.join('archive_structures as ast', 'ast.structure_id', 's.id').where('ast.archive_id', archiveId);
-      })
-      .select('v.*').first();
+    return this.nodeService.volume(volumeId, archiveId);
   }
 
-  /* This finds the archive and the linked archival inventory structure. If there are multiple linked structures,
-  it requires a caller-supplied structure ID instead of guessing which tree to modify. */
+  /** Ask the service for the eligible inventory structure. If several are linked, require structureId rather than guess.
+   * Confirm whether multiple inventory structures per archive are intended. */
 
   private async archiveStructure(archiveId: number, requestedId: unknown): Promise<{
     archive?: Record<string, unknown>; structure?: { id: number }; error?:{ message: string; status: number };
   }> {
-    const archive = await this.db('archives').where({ id: archiveId }).first();
-    if (!archive) return { error: { message: 'Archive not found.', status: 404 } };
-    const query = this.db('archive_structures as ast')
-      .join('structures as s', 's.id', 'ast.structure_id')
-      .where({ 'ast.archive_id': archiveId, 's.structure_type': 'arkivforteckning' })
-      .select('s.id');
+    const requested = requestedId === undefined || requestedId === null? undefined : validId(String(requestedId)) ?? undefined;
+    if (requestedId !== undefined && requestedId !== null && !requested) return { error: { message: 'structureId must be a positive integer.', status: 400 } };
+    const result = await this.nodeService.archiveAndStructure(archiveId, requested);
+    if (result.error) return { error: result.error };
 
-    if (requestedId !== undefined && requestedId !== null){
-      const id = validId(String(requestedId));
-      if (!id) return { error: { message: 'structureId must be a positive integer.', status: 400 } };
-      query.andWhere('s.id', id);
-    }
-    const structures = await query;
-    if (!structures.length) return { error: { message: 'Archive has no linked archival inventory structure.', status: 409 } };
-    if (structures.length > 1) return { error: { message: 'More than one archival inventory structure is linked; supply structureId.', status: 409 } };
-    return { archive, structure: structures[0] as { id: number } };
+    return { archive: result.archive, structure: result.structure };
+
   }
 
 
-  /* This determines the active node type used for series in this structure. A type ID narrows the lookup;
-   if null, it means there was no matching type. */
+  /** Resolve one active series type. The current rule uses EAD level "series"; confirm this matches configured types. */
 
-  private async resolveSeriesType(requested: unknown): Promise<number | null> {
-    const query = this.db('node_types').where({ structure_type: 'arkivforteckning', ead_level: 'series', is_active: true });
-    if (requested !== undefined && requested !== null) {
-      const id = validId(String(requested));
-      if (!id) return null;
-      query.andWhere({ id });
-    }
-    const types = await query.select('id');
-    return types.length === 1 ? Number(types[0].id) : null;
+  private async resolveSeriesType(requested: unknown): Promise<number| null> {
+    return this.nodeService.resolveSeriesType(requested);
   }
 
 
-  /* This Looks up the active child node types allowed beneath a series type.
-  It returns an ID only when one type is selected unambiguously, either naturally or by the caller's requested ID.
-  If there’s exactly one allowed type, it uses that; if there are several, the request must specify
-  nodeTypeId so the backend knows which one to create.
-  This was AI's insistence!!! still wrapping my head around it!*/
+  /** Resolve an allowed child type. Use it when unique; otherwise require nodeTypeId.
+   * Confirm that every allowed child type should be treated as a volume. */
 
   private async resolveVolumeType(parentTypeId: number, requested: unknown): Promise<number | null> {
-    const query = this.db('node_type_rules as r')
-      .join('node_types as nt', 'nt.id', 'r.child_type_id')
-      .where({ 'r.parent_type_id': parentTypeId, 'nt.is_active': true })
-      .select('nt.id');
-    if (requested !== undefined && requested !== null) {
-      const id = validId(String(requested));
-      if (!id) return null;
-      query.andWhere('nt.id', id);
-    }
-    const types = await query;
-    return types.length === 1 ? Number(types[0].id) : null;
+    return this.nodeService.resolveVolumeType(parentTypeId, requested);
+
   }
 
 
 
-  /* This requires a positive parent ID, loads the node and confirms it belongs to the chosen structure.
-  It sends a 400 response and returns false for missing or invalid parents, which prevents accidental root creations. */
+  /** Require a positive parent ID that belongs to the selected structure. These routes do not create root nodes. */
 
-  private async requiredParent(value: unknown, structureId: number, res: Response): Promise<NodeRow | false> {
-    if(value === undefined || value === null) {
+  private async requiredParent(value: unknown, structureId: number, res: Response): Promise<NodeRow | false>{
+    if(value === undefined|| value === null) {
       this.error(res, 'parentId is required; nodes cannot be created as roots.', 400);
       return false;
     }
     const id = validId(String(value));
     if(!id){ this.error(res, 'parentId must be a positive integer.', 400); return false; }
-    const parent = await findNode(this.db, id);
-    if (!parent || parent.structure_id !== structureId){
+    const parent = await this.nodeService.parent(id, structureId);
+    if (!parent){
       this.error(res, 'Parent must exist in the selected structure.', 400);
       return false;
+
     }
 
     return parent;
   }
 
 
-  /* This checks the configured parent-to-child node-type rule that determines whether this kind of node can be placed under
-  that kind of parent. */
-
-  private async isAllowedChild(parentTypeId: number, childTypeId: number): Promise<boolean> {
-    return Boolean(await this.db('node_type_rules').where({ parent_type_id: parentTypeId,
-      child_type_id: childTypeId }).first());
+  /** Ask the service whether node_type_rules allows this parent/child type pair. */
+  private async isAllowedChild(parentTypeId: number, childTypeId: number): Promise<boolean>{
+    return this.nodeService.isAllowedChild(parentTypeId, childTypeId);
   }
 
 
-  /* this finds the largest sibling sorting order for this parent and returns the next integer,
-  so a newly created child appears after existing siblings by default. */
-
+  /** Choose the next sibling position when the frontend did not send sortOrder. */
   private async nextSortOrder(structureId: number, parentId: number | null): Promise<number> {
-    const row = await this.db('nodes').where({ structure_id: structureId,
-      parent_id: parentId }).max({ value: 'sort_order' }).first();
-    return Number(row?.value ?? -1) + 1;
+    return this.nodeService.nextSortOrder(structureId, parentId);
   }
 
 
-  /* This writes a deletion in the audit log, removes the relationships that point to the node, and deletes the node.
-  The database rejects the delete if the node still has children; if success, it returns the removed row. */
+  /** Run the shared audited delete workflow and return the removed row. The database blocks deletion if children remain. */
 
   private async deleteNodeAndRelations(id: number, res: Response): Promise<void> {
-    try {
-      const node = await findNode(this.db, id);
-      await this.db.transaction(async (trx) => {
-        if (node) {
-          await recordNodeChange(trx, {
-            id, structureId: node.structure_id, action: 'delete', oldValue: node,
-            changedBy: this.requestContext.user?.id ?? null,
-          });}
-        await trx('node_relations').where((q) => q.where({ from_node_id: id }).orWhere({ to_node_id: id })).del();
-        await trx('nodes').where({ id }).del();
-      });
+    try{
+      const node = await this.nodeService.node(id);
+      if(!node) { this.error(res, 'Node not found.', 404); return; }
+
+      await this.nodeService.delete(id, node, this.requestContext.user?.id ?? null);
       res.json(node);
 
     } catch (error){
       this.error(res, error instanceof Error ? error.message : 'Could not delete node; Node may have children.', 409);
     }
   }
+
 }
 
 
 
-/* This converts API request fields to their database column names and validates values before insert/update logic uses them.
-It returns mapped values plus an error string when a name is empty or a generic date field is supplied.
-Attention here!!!: This mapping might not be needed at all or just be left here as a safeguard. The thing is we have not yet agreed
-exactly what will be sent from the frontend!
-*/
+/** Pick the fixed node columns this API accepts and normalize title/name. Dynamic node_property_values are not handled;
+ * their frontend payload shape still needs to be agreed. */
 
 function nodeFields(body: Record<string, unknown> | undefined): { values: Record<string, unknown>; error?: string } {
 
-  /*The API payload currently maps the columns on nodes.
-  Custom archive fields live in node_property_values and need a separate agreed JSON representation before saving here.
-  */
+/*Only fixed columns on nodes are mapped; EAV property values need a separate request contract.*/
   const input = body ?? {};
   const values: Record<string, unknown> = {};
-  const fields: Record<string, string> = {
-    title: 'title', name: 'title', referenceCode: 'reference_code', previousReferenceCode: 'previous_reference_code',
-    sortOrder: 'sort_order', validFrom: 'valid_from', validTo: 'valid_to', description: 'description',
-    portalUrl: 'portal_url', isPublished: 'is_published',
+  const fields: Record<string, string> ={
+    title: 'title', name: 'title', referenceCode: 'referenceCode', previousReferenceCode: 'previousReferenceCode',
+    sortOrder: 'sortOrder', validFrom: 'validFrom', validTo: 'validTo', description: 'description',
+    portalUrl: 'portalUrl', isPublished: 'isPublished',
   };
-  for (const [source, target] of Object.entries(fields)) {
-    if (input[source] !== undefined) values[target] = input[source];
+
+  for(const [source, target] of Object.entries(fields)) {
+    if(input[source] !== undefined) values[target] = input[source];
+
   }
-  if ('title' in values && (typeof values.title !== 'string' || !values.title.trim())) {
+  if('title' in values && (typeof values.title !== 'string' || !values.title.trim())) {
     return { values, error: 'name/title must not be empty strings.' };
   }
-  /*The schema has valid_from and valid_to, but no single generic "date" field. AI suggestion*/
-  if (input.date !== undefined) return { values, error: 'Use validFrom and/or validTo; the schema has no single date field.' };
+  if(input.date !== undefined) return { values, error: 'Use validFrom and/or validTo; the schema has no single date field.' };
+
   return { values };
 }

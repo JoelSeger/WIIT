@@ -1,5 +1,4 @@
 import type { Request } from 'express';
-import type { Knex } from 'knex';
 import type { User } from '../models/user';
 
 export type SessionUser = User & {
@@ -8,14 +7,13 @@ export type SessionUser = User & {
   groups?: string[];
 };
 
-/** Request-scoped dependencies shared by a controller handling one HTTP request. */
+/** Request-specific identity passed from a route handler to its controller. It deliberately contains no database connection. */
 export class RequestContext {
   readonly user: SessionUser | undefined;
 
 
-  /* This bundles the Express request and Knex connection for one controller invocation, and copies the user attached
-   by authentication middleware. Controllers use this object to access request identity and the database consistently. */
-  constructor(readonly request: Request, readonly db: Knex) {
+  /** Keep the original request and read the user attached by authentication middleware. */
+  constructor(readonly request: Request) {
     this.user = request.user as SessionUser | undefined;
   }
 }

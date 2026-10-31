@@ -21,7 +21,8 @@ app.use(session({
 app.use(attachUser);
 
 new Index(db).setRoutes(app);
-app.use('/mau-arkiv/users', createUserRouter(db));
+
+app.use('/api/users', createUserRouter(db));
 app.use('/api', createEadExportRouter({ knex: dbRaw, requireRole }));
 app.use('/api', createEadImportRouter({ knex: dbRaw, requireRole }));
 

@@ -5,8 +5,7 @@ import { UserRepository } from '../repos/userRepository';
 import { Knex } from 'knex';
 import { RequestContext } from '../types/requestContext';
 
-/* Builds the /users router and connects its list endpoint to a repository-backed service and a
-"request-scoped" controller. The db connection is shared, but the controller context is created whit each request. */
+/** Build the users router and its shared repository/service dependencies. */
 
 export function createUserRouter(db: Knex): Router {
   const router = Router();
@@ -15,12 +14,11 @@ export function createUserRouter(db: Knex): Router {
   const userService = new UserService(userRepository);
 
 
-  /* This creates a UserController per request for each GET request so the RequestContext sees the caller's session user,
-  then asks it to return the user list. */
+  /** Create a request-scoped controller for the list endpoint and forward async failures to Express. */
 
-  router.get('/all', (req, res) => {
-    const userController = new UserController(new RequestContext(req, db), userService);
-    void userController.getAllUsers(req, res);
+  router.get('/all', (req, res, next) => {
+    const userController = new UserController(new RequestContext(req), userService);
+    void userController.getAllUsers(req, res).catch(next);
   });
 
   return router;

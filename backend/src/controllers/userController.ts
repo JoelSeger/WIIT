@@ -5,12 +5,14 @@ import type { RequestContext } from '../types/requestContext';
 
 export class UserController extends BaseController {
 
-  /* this supplies the current request context to BaseController and retains the user service that performs the user lookups. */
+  /* this supplies the request context to BaseController and retains the user service for the user lookups. */
   constructor(context: RequestContext, private readonly userService: UserService) {
     super(context);
   }
 
-  /* Requests the first 100 users from UserService and returns them as JSON. A missing result or thrown service error is converted to an HTTP error response. */
+  /* Requests the first 100 users from UserService and returns them as JSON.
+  A missing result or thrown service error gives an HTTP error response. */
+
   getAllUsers = async (req: Request, res: Response): Promise<void> => {
     try {
       const users = await this.userService.getAllUsers(100, 0);
