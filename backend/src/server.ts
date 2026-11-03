@@ -1,31 +1,37 @@
-// src/server.ts
-import express, { Request, Response, NextFunction } from 'express';
-import dotenv from 'dotenv';
-import knex from 'knex';
-import knexConfig from '../knexfile';
-
-dotenv.config();
+import 'dotenv/config';
+import express, { type NextFunction, type Request, type Response } from 'express';
+import session from 'express-session';
+import { db, dbRaw } from './config/db';
+import { attachUser, requireRole } from './middleware/auth';
+import { createUserRouter } from './routers/userRoutes';
+import { createIndexRouter } from './routers/indexRoutes';
+import { createEadExportRouter } from './ead/exportRoute';
+import { createEadImportRouter } from './ead/importRoute';
+import { createNodeRouter } from './routers/nodeRoutes';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
-const db = knex(knexConfig.development);
+app.use(express.json());
+app.use(session({
+  secret: process.env.SESSION_SECRET ?? 'dev-only-change-me',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' },
+}));
+app.use(attachUser);
 
-// Tillfällig mock tills SSO/AD finns – loggar in som första användaren i databasen
-const requireRole = () => async (req: Request, _res: Response, next: NextFunction) => {
-  const user = await db('users').first<{ id: number }>('id');
-  req.user = { id: user ? user.id : null };
-  next();
-};
+app.use('/', createIndexRouter());
+app.use('/api/users', createUserRouter(db));
+// test URI only needs change!
+app.use('/api/node', createNodeRouter(db))
+app.use('/api', createEadExportRouter({ knex: dbRaw, requireRole }));
+app.use('/api', createEadImportRouter({ knex: dbRaw, requireRole }));
 
-// Ta bort kommentarer när export är portat :D
-// import { createEadExportRouter } from './ead/exportRoute';
-// app.use('/api', createEadExportRouter({ knex: db, requireRole }));
-
-app.get('/', (_req: Request, res: Response) => {
-  res.send('Servern körs!');
+// Routes call next(err) (multer, import errors), so something has to answer
+app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
+  console.error(err);
+  res.status(err.status ?? 500).json({ success: false, error: err.message });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));

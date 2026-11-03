@@ -8,3 +8,6 @@ node_modules/
 # Cache-filer som orsakat merge-konflikter i frontend, bör ignoreras
 *.tsbuildinfo 
 vite/deps/
+# Systemfiler (macOS/Windows)
+.DS_Store
+Thumbs.db

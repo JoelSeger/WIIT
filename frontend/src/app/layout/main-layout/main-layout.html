@@ -1,0 +1,17 @@
+<div class ="app-layout">
+
+    <app-header></app-header>
+
+    <app-nav (menuClicked)="menu.toggleMenu()"></app-nav>
+
+    <div class="app-body">
+        
+        <app-menu #menu></app-menu>
+        
+        <main class="app-content">
+            <router-outlet></router-outlet>
+        </main>
+
+    </div>
+
+</div>
