@@ -10,8 +10,8 @@ export class NodeService {
   constructor(
     private nodes: NodeRepository,
     private relations: NodeRelationRepository,
-    private changeLog: ChangeLogRepository,
     private uow: UnitOfWork,
+    // NO LOGGER IN THIS CLASS! IT IS A HELPER CLASS
   ) {}
 
   async get(id: number): Promise<Node> {
@@ -33,8 +33,8 @@ export class NodeService {
     return this.nodes.updateById(id, changes, userId, trx);
   }
 
-  async delete(id: number, userId: number, trx: Tx): Promise<boolean> {
-    return this.nodes.deletedById(id, userId, trx)
+  async delete(id: number, trx: Tx): Promise<boolean> {
+    return this.nodes.deletedById(id, trx)
   }
 
   // DON'T THINK WE NEED TO IMPLEMENT THIS ONE!

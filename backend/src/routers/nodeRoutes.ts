@@ -3,19 +3,19 @@ import type { Knex } from "knex";
 import { NodeController } from "../controllers/nodeController";
 import { NodeService } from "../services/nodeService";
 import { NodeRepository } from "../repos/nodeRepository";
-import { NodeTypeRepository } from "../repos/nodeTypeRepository";
 import { PropertyDefinitionRepository } from "../repos/propertyDefinitionRepository";
-import { StructureRepository } from "../repos/structureRepository";
 import { requireRole } from "../middleware/auth";
+import { NodeRelationRepository } from "../repos/nodeRelationRepository";
+import { UnitOfWork } from "../db/unitOfWork";
 
 export function createNodeRouter(db: Knex): Router {
   const router = Router();
 
   const service = new NodeService(
     new NodeRepository(db),
-    new NodeTypeRepository(db),
+    new NodeRelationRepository(db),
     new PropertyDefinitionRepository(db),
-    new StructureRepository(db),
+    new UnitOfWork(db),
   );
   const controller = new NodeController(service);
 
