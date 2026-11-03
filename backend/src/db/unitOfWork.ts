@@ -1,3 +1,5 @@
+import { Knex } from "knex";
+
 // db/unitOfWork.ts
 export type Tx = Knex.Transaction;
 export class UnitOfWork {

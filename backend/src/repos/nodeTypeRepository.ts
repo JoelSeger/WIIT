@@ -3,7 +3,7 @@ import { CrudRepository } from "./crudRepository";
 import type { NodeType } from "../models/node/nodeType";
 
 export class NodeTypeRepository extends CrudRepository<NodeType> {
-  constructor(db: Knex) {
+  constructor(protected readonly db: Knex) {
     super(db, "node_types");
   }
 

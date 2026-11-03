@@ -1,7 +1,7 @@
 import type { Knex } from "knex";
 import { CrudRepository } from "./crudRepository";
 import type { Structure } from "../models/structure/structure";
-import { ArchiveStructure } from "../models/archive/archiveStructure";
+import type { ArchiveStructure } from "../models/archive/archiveStructure";
 
 export class StructureRepository extends CrudRepository<Structure> {
   constructor(db: Knex) {
@@ -14,35 +14,19 @@ export class StructureRepository extends CrudRepository<Structure> {
       .select();
   }
 
-  async findById(id: number): Promise<Structure> {
-    const [structure] = await this.q()
-      .where({ id })
-      .select();
-
-    return structure;
+  async findById(id: number): Promise<Structure | undefined> {
+    return super.findOne(String.apply(id));
   }
 
   async findLinkedToArchive(archiveId: number, structureType: string): Promise<Structure[]> {
-    const structures = await this.q('archive_structures')
-      .where({ archiveId })
-      .andWhere({ structureType })
-      .select('*')
-
-    return structures;
+    return this.q()
+      .join('archive_structures as ast', 'ast.structure_id', 'structures.id')
+      .where({ 'ast.archive_id': archiveId, 'structures.structure_type': structureType })
+      .select('structures.*');
   }
 
   async findLinksForArchives(archiveIds: number[]): Promise<ArchiveStructure[]> {
-    const links = new Array<ArchiveStructure>();
-
-    for (const archiveId in archiveIds) {
-      const link = await this.q('archive_structures')
-        .where({ archiveId })
-        .select('*');
-
-      links.push(link);
-    }
-
-    return links;
+    if (archiveIds.length === 0) return [];
+    return this.db('archive_structures').whereIn('archive_id', archiveIds).select();
   }
-
 }
