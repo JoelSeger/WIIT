@@ -23,7 +23,8 @@ app.use(attachUser);
 
 app.use('/', createIndexRouter());
 app.use('/api/users', createUserRouter(db));
-app.use('/api/node', createNodeRouter(db));
+// test URI only needs change!
+app.use('/api/node', createNodeRouter(db))
 app.use('/api', createEadExportRouter({ knex: dbRaw, requireRole }));
 app.use('/api', createEadImportRouter({ knex: dbRaw, requireRole }));
 
