@@ -11,13 +11,12 @@ import { NotificationPopup } from './components/notification-popup/notification
 
 @Component({
   imports: [RouterOutlet, Header, Nav, Menu, Settings, StorageUnit, LoadingSpinner, NotificationPopup],
-  import { LoadingSpinner } from './components/loading-spinner/loading-spinner';
-  import { NotificationPopup } from './components/notification-popup/notification-popup';
 
   selector: 'app-root',
   styleUrl: './app.scss',
   templateUrl: './app.html',
 })
+
 export class App {
   protected readonly title = signal('WIIT');
 }
