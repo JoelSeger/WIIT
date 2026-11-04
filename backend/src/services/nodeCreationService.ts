@@ -1,5 +1,5 @@
 import type { Knex } from "knex";
-import { NodeRepository } from "../repos/nodeRepository";
+import { NodeRepository } from "../repos/NodeRepository";
 import { NodeTypeRepository } from "../repos/nodeTypeRepository";
 import type { Node } from "../models/node/node";
 
@@ -21,7 +21,7 @@ export class NodeServiceError extends Error {
     }
 }
 
-export class NodeService {
+export class NodeCreationService {
     constructor(private readonly knex: Knex) {}
 
     async createNode(data: CreateNodeRequest): Promise<Node> {

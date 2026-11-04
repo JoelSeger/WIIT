@@ -1,9 +1,9 @@
 
 import type { Request, Response } from "express";
-import { NodeService } from "../services/nodeService";
+import { NodeCreationService } from "../services/nodeCreationService";
 
 export class NodeController {
-    constructor(private readonly nodeService: NodeService) {}
+    constructor(private readonly nodeService: NodeCreationService) {}
 
     createNode = async (req: Request, res: Response): Promise<void> => {
         try {

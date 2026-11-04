@@ -1,7 +1,7 @@
 
 import { Router } from "express";
 import type { Knex } from "knex";
-import { NodeController } from "../controllers/nodeController";
+import { NodeController } from "../controllers/nodeCreationController";
 import { NodeService } from "../services/nodeService";
 
 export function createNodeRouter(knex: Knex): Router {
