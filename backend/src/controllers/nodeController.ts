@@ -1,11 +1,10 @@
 import { Request, Response } from "express";
 import { BaseController } from "./baseController";
 import { NodeService } from "../services/nodeService";
-import { RequestContext } from "../types/requestContext";
 
 export class NodeController extends BaseController {
-  constructor(context: RequestContext, private readonly nodeService: NodeService) {
-    super(context);
+  constructor(private readonly nodeService: NodeService) {
+    super();
   }
 
   getTree = (publicOnly: boolean) => async (req: Request, res: Response): Promise<void> => {

@@ -10,8 +10,8 @@ export class StructureRepository extends CrudRepository<Structure> {
 
   async findByType(structureType: string): Promise<Structure[]> {
     return await this.q()
-      .where({ structure_type: structureType })
-      .select();
+      .where("structure_type", structureType)
+      .select("*");
   }
 
   async findById(id: number): Promise<Structure | undefined> {

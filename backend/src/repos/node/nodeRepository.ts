@@ -1,8 +1,8 @@
 import type { Knex } from "knex";
-import { CrudRepository } from "./crudRepository";
-import type { Node } from "../models/node/node";
-import { Tx } from "../db/unitOfWork";
-
+import { CrudRepository } from "../crudRepository";
+import type { Node } from "../../models/node/node";
+import { Tx } from "../../db/unitOfWork";
+import { NodePropertyValues } from "../../models/node/nodePropertyValues";
 export class NodeRepository extends CrudRepository<Node> {
   constructor(protected readonly db: Knex) {
     super(db, "nodes");
@@ -19,6 +19,26 @@ export class NodeRepository extends CrudRepository<Node> {
     return this.q(trx)
       .where({ structureId })
       .orderBy([{ column: "parentId" }, { column: "sortOrder" }, { column: "id" }]);
+  }
+
+  async findByStructures(structureIds: number[]): Promise<Node[]> {
+    const nodes = [];
+    for (const id in structureIds) {
+      const node = await this.q()
+        .where(id, 'structure_id')
+        .first()
+      if (!node) throw new Error(`Node with structure_id: ${id} was not found `)
+      nodes.push(node);
+    }
+    return nodes;
+  }
+
+  async findValuesByStructure(structureId: number): Promise<NodePropertyValues[]> {
+    return this.q()
+        .from("node_property_values as v")
+        .join("nodes as n", "n.id", "v.node_id")
+        .where("n.structure_id", structureId)
+        .select("v.*");
   }
 
   async findChildren(parentId: number): Promise<Node[]> {
@@ -80,7 +100,7 @@ export class NodeRepository extends CrudRepository<Node> {
     return updatedNode;
   }
 
-  async deletedById(id: number, userId: number, trx: Tx): Promise<boolean> {
+  async deletedById(id: number, trx: Tx): Promise<boolean> {
     const result = await this.q(trx)
       .where({ id })
       .delete();

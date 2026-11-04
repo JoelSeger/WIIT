@@ -4,11 +4,11 @@ import session from 'express-session';
 import { db, dbRaw } from './config/db';
 import { attachUser, requireRole } from './middleware/auth';
 import { createUserRouter } from './routers/userRoutes';
-import { Index } from './routes';
 import { createEadExportRouter } from './ead/exportRoute';
 import { createEadImportRouter } from './ead/importRoute';
 import { createNodeRouter } from './routers/nodeRoutes';
-import { errorHandler } from './middleware/errorHandler';
+import { createClassificationRouter } from './routers/classificationRouter';
+import { createIndexRouter } from './routers/indexRoutes';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -22,12 +22,18 @@ app.use(session({
 }));
 app.use(attachUser);
 
-new Index(db).setRoutes(app);
+app.use('/', createIndexRouter());
 app.use('/api/users', createUserRouter(db));
+// test URI only needs change!
 app.use('/api/node', createNodeRouter(db));
+app.use('/api/classification', createClassificationRouter(db));
 app.use('/api', createEadExportRouter({ knex: dbRaw, requireRole }));
 app.use('/api', createEadImportRouter({ knex: dbRaw, requireRole }));
 
-app.use(errorHandler);
+// Routes call next(err) (multer, import errors), so something has to answer
+app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
+  console.error(err);
+  res.status(err.status ?? 500).json({ success: false, error: err.message });
+});
 
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));

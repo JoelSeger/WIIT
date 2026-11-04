@@ -1,6 +1,6 @@
 import type { Knex } from "knex";
-import { CrudRepository } from "./crudRepository";
-import type { NodeType } from "../models/node/nodeType";
+import { CrudRepository } from "../crudRepository";
+import type { NodeType } from "../../models/node/nodeType";
 
 export class NodeTypeRepository extends CrudRepository<NodeType> {
   constructor(protected readonly db: Knex) {
@@ -11,6 +11,11 @@ export class NodeTypeRepository extends CrudRepository<NodeType> {
     return await this.q()
       .where({ id })
       .select()
+  }
+
+  async findByIds(ids: number[]): Promise<NodeType[]> {
+    if (ids.length === 0) return [];
+    return await this.q().whereIn("id", ids);
   }
 
   async findActiveByStructureType(structureType: string): Promise<NodeType[]> {
