@@ -1,0 +1,19 @@
+<div class="notification" [class.success]="type === 'success'"
+                          [class.error]="type === 'error'"
+                          role="alert">
+
+  <span class="notification-icon">
+    @if (type === 'success') {
+      ✓
+    } @else {
+      ✕
+    }
+  </span>
+
+  <p>{{ message }}</p>
+
+  <button type="button" (click)="close()" aria-label="Stäng notis">
+    ✕
+  </button>
+
+</div>
