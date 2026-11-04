@@ -12,6 +12,46 @@ $hover-background: rgba(0, 0, 0, 0.1);
   padding: 3px 0.6rem;
   box-sizing: border-box;
 
+  .nav-search {
+  position: relative;
+  width: 350px;
+  margin-left: auto;
+  margin-right: 2rem;
+  padding: 7px;
+
+  input {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid #cccccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+  }
+
+  .search-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    background-color: white;
+    border: 1px solid #cccccc;
+    z-index: 100;
+
+    button {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      border: none;
+      background-color: white;
+      text-align: left;
+      cursor: pointer;
+
+      &:hover {
+        background-color: #eeeeee;
+      }
+    }
+  }
+}
+
   .nav-left,
   .nav-right {
     display: flex;

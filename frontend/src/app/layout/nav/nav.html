@@ -21,6 +21,31 @@
     </button>
   </div>
 
+  <div class = "nav-search">
+    <input 
+    type="search"
+    placeholder="sök..."
+    aria-label="Sök i arkivet"
+    [value]="searchText"
+    (input)="onSearch($event)"
+    />
+
+    @if (searchSuggestions.length > 0) {
+      <div class="search-suggestions">
+        @for (item of searchSuggestions; track item) {
+          <button
+            type="button"
+            (click)="selectSuggestion(item)"
+          >
+            {{ item }}
+          </button>
+        }
+        </div>
+      }
+      </div>
+    
+  
+
   <div class="nav-right">
     <button class="nav-button" type="button"
       (click)="logout()" aria-label="Logga ut">
