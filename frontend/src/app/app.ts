@@ -4,12 +4,16 @@ import { Settings } from './pages/settings/settings';
 import { Header } from './layout/header/header';
 import { Nav } from './layout/nav/nav';
 import { Menu } from './layout/menu/menu';
-import { LoadingSpinner } from './components/loading-spinner/loading-spinner';
-import { NotificationPopup } from './components/notification-popup/notification-popup';
+import { StorageUnit } from './pages/storage-unit/storage-unit';
+import { LoadingSpinner } from './components/loading-spinner/loading-spinner';
+import { NotificationPopup } from './components/notification-popup/notification-popup';
 
 
 @Component({
-  imports: [RouterOutlet, Header, Nav, Menu, Settings, LoadingSpinner, NotificationPopup],
+  imports: [RouterOutlet, Header, Nav, Menu, Settings, StorageUnit, LoadingSpinner, NotificationPopup],
+  import { LoadingSpinner } from './components/loading-spinner/loading-spinner';
+  import { NotificationPopup } from './components/notification-popup/notification-popup';
+
   selector: 'app-root',
   styleUrl: './app.scss',
   templateUrl: './app.html',

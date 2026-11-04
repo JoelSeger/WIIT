@@ -40,8 +40,8 @@ export class Menu {
 
     const deltaX = event.clientX - this.startX;
     const newWidth = this.startWidth + deltaX;
+    this.menuWidth = Math.max(200, Math.min(850, newWidth));
 
-    this.menuWidth = Math.max(200, Math.min(600, newWidth));
   }
   
   @HostListener('document:mouseup')

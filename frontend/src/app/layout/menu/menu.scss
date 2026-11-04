@@ -1,7 +1,8 @@
 // SCSS variables
 $menu-background: #ececec;
 $menu-min-width: 200px;
-$menu-max-width: 600px;
+
+$menu-max-width: 850px;
 $menu-closed-width: 40px;
 $resize-handle-width: 10px;
 
@@ -15,6 +16,7 @@ $resize-handle-width: 10px;
   flex-shrink: 0;
   position: relative;
   box-sizing: border-box;
+  min-height: 100%;
 
 
   // Adjusts the menu when it is collapsed
