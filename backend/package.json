@@ -8,12 +8,21 @@
     "build": "tsc",
     "start": "node dist/src/server.js",
     "typecheck": "tsc --noEmit",
+<<<<<<< HEAD
     "migrate": "cross-env NODE_OPTIONS=--import=tsx knex migrate:latest --knexfile knexfile.ts",
     "migrate:make": "cross-env NODE_OPTIONS=--import=tsx knex migrate:make --knexfile knexfile.ts",
     "migrate:rollback": "cross-env NODE_OPTIONS=--import=tsx knex migrate:rollback --knexfile knexfile.ts",
     "migrate:status": "cross-env NODE_OPTIONS=--import=tsx knex migrate:status --knexfile knexfile.ts",
     "seed": "cross-env NODE_OPTIONS=--import=tsx knex seed:run --knexfile knexfile.ts",
     "seed:make": "cross-env NODE_OPTIONS=--import=tsx knex seed:make --knexfile knexfile.ts",
+=======
+    "migrate":          "node --import tsx node_modules/knex/bin/cli.js migrate:latest --knexfile knexfile.ts",
+    "migrate:make":     "node --import tsx node_modules/knex/bin/cli.js migrate:make --knexfile knexfile.ts",
+    "migrate:rollback": "node --import tsx node_modules/knex/bin/cli.js migrate:rollback --knexfile knexfile.ts",
+    "migrate:status":   "node --import tsx node_modules/knex/bin/cli.js migrate:status --knexfile knexfile.ts",
+    "seed":             "node --import tsx node_modules/knex/bin/cli.js seed:run --knexfile knexfile.ts",
+    "seed:make":        "node --import tsx node_modules/knex/bin/cli.js seed:make --knexfile knexfile.ts",
+>>>>>>> develop
     "test": "tsx test/ead-export.test.ts && tsx test/ead-import.test.ts"
   },
   "keywords": [],

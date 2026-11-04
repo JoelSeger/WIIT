@@ -7,8 +7,9 @@ import { createUserRouter } from './routers/userRoutes';
 import { createIndexRouter } from './routers/indexRoutes';
 import { createEadExportRouter } from './ead/exportRoute';
 import { createEadImportRouter } from './ead/importRoute';
-import { createStructureCreationRoutes } from "../src/routers/structureCreationRoute";
-import { createNodeRouter } from "../src/routers/nodeRoute";
+import { createStructureCreationRoutes } from './routers/structureCreationRoute';
+import { createNodeRouter } from './routers/nodeRoutes';              // develop: getTree
+import { createNodeCreationRouter } from './routers/nodeRoute';       // فرعك: createNode
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -23,12 +24,14 @@ app.use(session({
 app.use(attachUser);
 
 app.use('/', createIndexRouter());
-app.use('/mau-arkiv/users', createUserRouter(db));
+app.use('/api/users', createUserRouter(db));
+// test URI only needs change!
+app.use('/api/node', createNodeRouter(db))
 app.use('/api', createEadExportRouter({ knex: dbRaw, requireRole }));
 app.use('/api', createEadImportRouter({ knex: dbRaw, requireRole }));
 app.use("/api/structures", createStructureCreationRoutes(db));
-app.use("/api/nodes", createNodeRouter(db));
-// Routes call next(err) (multer, import errors), so something has to answer
+app.use('/api/nodes', createNodeCreationRouter(db));         // POST create
+// // Routes call next(err) (multer, import errors), so something has to answer
 app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
   res.status(err.status ?? 500).json({ success: false, error: err.message });

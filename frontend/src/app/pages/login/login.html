@@ -6,7 +6,7 @@
             src="images/mau-logo.svg"
             alt="Malmö Universitets logotyp"
         />
-
+        <div class="login-form">
         <form
             #loginForm="ngForm" 
             (ngSubmit)="onSubmit()"
@@ -30,10 +30,10 @@
                 @if (emailCtrl.invalid && (emailCtrl.dirty || emailCtrl.touched)) {
                     <div class="error-message">
                         @if (emailCtrl.errors?.['required']) {
-                            <span="emailCtrl.errors?.['required']">E-post krävs.</span>
+                            <span>E-post krävs.</span>
                         }
                         @if (emailCtrl.errors?.['email']) {
-                            <span="emailCtrl.errors?.['email']">Ange en giltig e-postadress.</span>
+                            <span>Ange en giltig e-postadress.</span>
                         }
                     </div>
                 }
@@ -42,6 +42,7 @@
             <!-- Password Field -->
             <div class="form-content">
                 <label for="password">Lösenord</label>
+
                 <input
                     id="password"
                     type="password"
@@ -61,9 +62,16 @@
                 }
             </div>
 
-            <button type="submit" [disabled]="loginForm.invalid">
-                Logga in
+            <button type="submit" [disabled]="loginForm.invalid" || isSubmitting>
+                {{ isSubmitting ? 'Loggar in...' : 'Logga in' }}
             </button>
+
+           @if (loginError) {
+            <p class="login-error" role="alert">
+                {{ loginError }}
+            </p>
+           } 
         </form>
+        </div>
     </section>
 </main>
