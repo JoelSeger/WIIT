@@ -3,6 +3,7 @@ import { RouterOutlet } from '@angular/router';
 import { Header } from '../header/header';
 import { Nav } from '../nav/nav';
 import { Menu } from '../menu/menu';
+import { TreeView } from '../tree-view/tree-view';
 
 @Component({
   selector: 'app-main-layout',
@@ -11,7 +12,8 @@ import { Menu } from '../menu/menu';
     RouterOutlet,
     Header,
     Nav,
-    Menu
+    Menu,
+    TreeView
   ],
   templateUrl: './main-layout.html',
   styleUrl: './main-layout.scss'
