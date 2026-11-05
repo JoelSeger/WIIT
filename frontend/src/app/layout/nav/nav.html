@@ -47,10 +47,16 @@
   
 
   <div class="nav-right">
-    <button class="nav-button" type="button"
-      (click)="logout()" aria-label="Logga ut">
-      <img [src]="logoutIconUrl" alt="" />
-    </button>
+    @if (loginService.currentUser()) {
+      <button class="nav-button" type="button" (click)="loginService.logout()" aria-label="Logga ut">
+        <img [src]="logoutIconUrl" alt="Logga ut" />
+      </button>
+
+    } @else {
+      <a routerLink="/login" class="nav-button" aria-label="Logga in">
+        <img [src]="loginIconUrl" alt="Logga in" />
+      </a>
+    }
   </div>
 </nav>
 

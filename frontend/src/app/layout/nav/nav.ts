@@ -1,13 +1,17 @@
-import { Component, output, HostListener, ElementRef } from '@angular/core';
+import { Component, inject, output, HostListener, ElementRef } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { LoginService } from '../../core/services/login.service';
 
 @Component({
-  imports: [],
+  imports: [RouterLink],
+  standalone: true,
   selector: 'app-nav',
   styleUrl: './nav.scss',
   templateUrl: './nav.html',
 })
 export class Nav {
 
+  loginService = inject(LoginService);
   constructor(private elementRef: ElementRef) {}
   
   menuIconUrl: string = '/menu.png';
@@ -15,9 +19,9 @@ export class Nav {
   homeIconUrl: string = '/home.png';
   downloadIconUrl: string = '/download.png';
   logoutIconUrl: string = '/logout.png';
+  loginIconUrl: string = '/login.png';
 
   menuClicked = output<void>();
-
   openMenu(): void {
     this.menuClicked.emit();
   }

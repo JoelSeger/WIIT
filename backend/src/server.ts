@@ -8,8 +8,9 @@ import { createIndexRouter } from './routers/indexRoutes';
 import { createEadExportRouter } from './ead/exportRoute';
 import { createEadImportRouter } from './ead/importRoute';
 import { createStructureCreationRoutes } from './routers/structureCreationRoute';
-import { createNodeRouter } from './routers/nodeRoutes';              
 import { createNodeCreationRouter } from './routers/nodeRoute';
+import { createNodeRouter } from './routers/nodeRoutes';
+import { createSearchRouter } from './routers/searchRoutes';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -27,6 +28,7 @@ app.use('/', createIndexRouter());
 app.use('/api/users', createUserRouter(db));
 // test URI only needs change!
 app.use('/api/node', createNodeRouter(db))
+app.use('/api/search', createSearchRouter(db));
 app.use('/api', createEadExportRouter({ knex: dbRaw, requireRole }));
 app.use('/api', createEadImportRouter({ knex: dbRaw, requireRole }));
 app.use("/api/structures", createStructureCreationRoutes(db));
