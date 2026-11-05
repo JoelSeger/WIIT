@@ -1,0 +1,44 @@
+<aside 
+#menuContainer 
+class="menu" 
+[class.closed]="!isOpen"
+[style.width.px]="isOpen ? menuWidth : 40"
+>
+
+  <div class="menu-top">
+    <button 
+    class="menu-toggle" 
+    type="button"
+    (click)="toggleMenu()"
+    [attr.aria-label]="isOpen ? 'Stäng menyn' : 'Öppna menyn'"
+    >
+
+    <img
+        src="/chevron-left.png"
+        alt=""
+        [class.rotated]="!isOpen"
+        />
+    </button>
+  </div>
+
+
+  <!-- Displays the menu content only when the menu is open -->
+  @if (isOpen) {
+    <div class="menu-inner">
+        <div class="menu-content">
+          <a class="menu-link" routerLink="/archive-structure">Arkivbildare (Allmänna)</a>
+          <a class="menu-link" routerLink="/public-archival-system">Klassificeringsstruktur</a>
+          <a class="menu-link" routerLink="/storage-unit">Förvaringsenheter</a>
+        </div>
+
+  <div class="menu-bottom">
+    <a routerLink="/settings" class="menu-link">
+      <img src="/settings.png" alt="" />
+      <span>Inställningar</span>
+    </a>
+  </div>
+  </div>
+
+  <div class="resize-handle" (mousedown)="startResize($event)"></div>
+}
+</aside>

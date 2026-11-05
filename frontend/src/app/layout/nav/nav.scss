@@ -1,0 +1,90 @@
+// SCSS variables
+$nav-background: #f20d3a;
+$hover-background: rgba(0, 0, 0, 0.1);
+
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: $nav-background;
+  width: 100%;
+  min-height: 32px;
+  padding: 3px 0.6rem;
+  box-sizing: border-box;
+
+  .nav-search {
+  position: relative;
+  width: 350px;
+  margin-left: auto;
+  margin-right: 2rem;
+  padding: 7px;
+
+  input {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid #cccccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+  }
+
+  .search-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    background-color: white;
+    border: 1px solid #cccccc;
+    z-index: 100;
+
+    button {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      border: none;
+      background-color: white;
+      text-align: left;
+      cursor: pointer;
+
+      &:hover {
+        background-color: #eeeeee;
+      }
+    }
+  }
+}
+
+  .nav-left,
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .nav-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 3px;
+    border: none;
+    background-color: transparent;
+    cursor: pointer;
+
+    img {
+      width: 20px;
+      height: 20px;
+      object-fit: contain;
+      display: block;
+    }
+
+    &:hover {
+      background-color: $hover-background;
+      border-radius: 4px;
+    }
+
+    &:focus-visible {
+      outline: 2px solid black;
+      outline-offset: 2px;
+    }
+  }
+}

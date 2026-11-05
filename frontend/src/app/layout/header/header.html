@@ -1,1 +1,23 @@
-<p>header works!</p>
+<header class="header">
+  <div class="header-logo">
+    <img
+      [src]="logoUrl"
+      [alt]="logoAlt"
+      class="logo"
+/>
+  </div>
+
+    <div class="header-user">
+      <span class="user-label">
+        @if (loginService.currentUser()) {
+          {{ loginService.currentUser() }}
+        } @else {
+          Besökare
+        }
+      </span>
+
+      <button class="user-button" type="button" aria-label="Användarprofil">
+        <img [src]="profileIconUrl" alt="Profil" class="profile-icon" />
+      </button>
+    </div>
+</header>

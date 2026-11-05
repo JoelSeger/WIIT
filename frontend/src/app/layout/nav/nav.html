@@ -1,0 +1,62 @@
+<nav class="nav" aria-label="Huvudnavigation">
+  <div class="nav-left">
+    <button class="nav-button" type="button"
+      (click)="openMenu()" aria-label="Öppna menyn">
+      <img [src]="menuIconUrl" alt="" />
+    </button>
+
+    <button class="nav-button" type="button"
+      (click)="addItem()" aria-label="Lägg till">
+      <img [src]="addIconUrl" alt="" />
+    </button>
+
+    <button class="nav-button" type="button"
+      (click)="goHome()" aria-label="Startsida">
+      <img [src]="homeIconUrl" alt="" />
+    </button>
+
+    <button class="nav-button" type="button"
+      (click)="download()" aria-label="Ladda ner">
+      <img [src]="downloadIconUrl" alt="" />
+    </button>
+  </div>
+
+  <div class = "nav-search">
+    <input 
+    type="search"
+    placeholder="sök..."
+    aria-label="Sök i arkivet"
+    [value]="searchText"
+    (input)="onSearch($event)"
+    />
+
+    @if (searchSuggestions.length > 0) {
+      <div class="search-suggestions">
+        @for (item of searchSuggestions; track item) {
+          <button
+            type="button"
+            (click)="selectSuggestion(item)"
+          >
+            {{ item }}
+          </button>
+        }
+        </div>
+      }
+      </div>
+    
+  
+
+  <div class="nav-right">
+    @if (loginService.currentUser()) {
+      <button class="nav-button" type="button" (click)="loginService.logout()" aria-label="Logga ut">
+        <img [src]="logoutIconUrl" alt="Logga ut" />
+      </button>
+
+    } @else {
+      <a routerLink="/login" class="nav-button" aria-label="Logga in">
+        <img [src]="loginIconUrl" alt="Logga in" />
+      </a>
+    }
+  </div>
+</nav>
+

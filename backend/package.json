@@ -1,23 +1,47 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "server.js",
+  "description": "WIIT",
+  "main": "dist/src/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/src/server.js",
+    "typecheck": "tsc --noEmit",
+    "migrate":          "node --import tsx node_modules/knex/bin/cli.js migrate:latest --knexfile knexfile.ts",
+    "migrate:make":     "node --import tsx node_modules/knex/bin/cli.js migrate:make --knexfile knexfile.ts",
+    "migrate:rollback": "node --import tsx node_modules/knex/bin/cli.js migrate:rollback --knexfile knexfile.ts",
+    "migrate:status":   "node --import tsx node_modules/knex/bin/cli.js migrate:status --knexfile knexfile.ts",
+    "seed":             "node --import tsx node_modules/knex/bin/cli.js seed:run --knexfile knexfile.ts",
+    "seed:make":        "node --import tsx node_modules/knex/bin/cli.js seed:make --knexfile knexfile.ts",
+    "test": "tsx test/ead-export.test.ts && tsx test/ead-import.test.ts"
   },
   "keywords": [],
-  "author": "",
-  "license": "GPL-3.0-only",
   "type": "commonjs",
   "dependencies": {
-    "dotenv": "^18.0.5",
-    "express": "^5.2.1",
+    "@azure/identity": "^4.14.0",
+    "dotenv": "^18.0.8",
+    "express": "^5.3.0",
+    "express-session": "^1.19.0",
+    "fast-xml-parser": "^5.11.2",
     "knex": "^3.3.0",
-    "mssql": "^12.7.2",
-    "tedious": "^20.3.3"
+    "knex-stringcase": "^1.6.0",
+    "mssql": "^12.7.9",
+    "multer": "^2.4.0",
+    "tedious": "^20.3.7"
   },
   "devDependencies": {
-    "better-sqlite3": "^13.0.3"
+    "@types/express": "^5.0.6",
+    "@types/express-session": "^1.19.0",
+    "@types/mssql": "^12.3.0",
+    "@types/multer": "^2.3.0",
+    "@types/node": "^26.6.5",
+    "better-sqlite3": "^13.0.3",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "better-sqlite3@13.0.3": true
   }
 }
