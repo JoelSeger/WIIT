@@ -5,7 +5,6 @@ class="menu"
 [style.width.px]="isOpen ? menuWidth : 40"
 >
 
-
   <div class="menu-top">
     <button 
     class="menu-toggle" 
@@ -25,12 +24,19 @@ class="menu"
 
   <!-- Displays the menu content only when the menu is open -->
   @if (isOpen) {
-
-  <div class="menu-content"></div>
+    <div class="menu-inner">
+        <div class="menu-content">
+          <a class="menu-link" routerLink="/archive-structure">Arkivbildare (Allmänna)</a>
+          <a class="menu-link" routerLink="/public-archival-system">Klassificeringsstruktur</a>
+          <a class="menu-link" routerLink="/storage-unit">Förvaringsenheter</a>
+        </div>
 
   <div class="menu-bottom">
-    <img src="/settings.png" alt="" />
-    <span>Inställningar</span>
+    <a routerLink="/settings" class="menu-link">
+      <img src="/settings.png" alt="" />
+      <span>Inställningar</span>
+    </a>
+  </div>
   </div>
 
   <div class="resize-handle" (mousedown)="startResize($event)"></div>

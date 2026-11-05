@@ -4,25 +4,20 @@
       [src]="logoUrl"
       [alt]="logoAlt"
       class="logo"
-    />
-
-    <span class="university-name">Malmö Universitet</span>
+/>
   </div>
 
-  <div class="header-user">
-    <span class="user-label">{{ userLabel }}</span>
+    <div class="header-user">
+      <span class="user-label">
+        @if (loginService.currentUser()) {
+          {{ loginService.currentUser() }}
+        } @else {
+          Besökare
+        }
+      </span>
 
-    <button
-      class="user-button"
-      type="button"
-      (click)="openProfile()"
-      aria-label="Användarprofil"
-    >
-      <img
-        [src]="profileIconUrl"
-        alt=""
-        class="profile-icon"
-      />
-    </button>
-  </div>
+      <button class="user-button" type="button" aria-label="Användarprofil">
+        <img [src]="profileIconUrl" alt="Profil" class="profile-icon" />
+      </button>
+    </div>
 </header>
