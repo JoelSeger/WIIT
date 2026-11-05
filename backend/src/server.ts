@@ -9,6 +9,7 @@ import { createEadExportRouter } from './ead/exportRoute';
 import { createEadImportRouter } from './ead/importRoute';
 import { createNodeRouter } from './routers/nodeRoutes';
 import { createSearchRouter } from './routers/searchRoutes';
+import { createAuthRouter, devLoginAllowed } from './routers/authRoutes';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -23,6 +24,7 @@ app.use(session({
 app.use(attachUser);
 
 app.use('/', createIndexRouter());
+app.use('/api/auth', createAuthRouter(db));
 app.use('/api/users', createUserRouter(db));
 // test URI only needs change!
 app.use('/api/node', createNodeRouter(db))
@@ -36,4 +38,7 @@ app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: 
   res.status(err.status ?? 500).json({ success: false, error: err.message });
 });
 
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+  if (devLoginAllowed()) console.warn('DEV_LOGIN is on: POST /api/auth/dev-login lets anyone log in. Never in production.');
+});
