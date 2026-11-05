@@ -8,8 +8,8 @@ import { createIndexRouter } from './routers/indexRoutes';
 import { createEadExportRouter } from './ead/exportRoute';
 import { createEadImportRouter } from './ead/importRoute';
 import { createStructureCreationRoutes } from './routers/structureCreationRoute';
-import { createNodeRouter } from './routers/nodeRoutes';              // develop: getTree
-import { createNodeCreationRouter } from './routers/nodeRoute';       // فرعك: createNode
+import { createNodeRouter } from './routers/nodeRoutes';              
+import { createNodeCreationRouter } from './routers/nodeRoute';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;

@@ -1,5 +1,5 @@
 import type { Knex } from "knex";
-import { NodeRepository } from "../repos/NodeRepository";
+import { NodeRepository } from "../repos/nodeRepository";
 import { NodeTypeRepository } from "../repos/nodeTypeRepository";
 import type { Node } from "../models/node/node";
 

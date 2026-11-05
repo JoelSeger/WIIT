@@ -42,7 +42,7 @@ export class StructureCreationService {
       let createdCreator: ArchiveCreator | undefined;
       let archive: Archive;
 
-      // 1. تحديد الأرشيف: موجود أم جديد؟
+      // 1. Determin wether it is an existing archive or a new one
       if (request.archiveId !== undefined) {
         if (request.newArchive) {
           throw new Error(
@@ -65,7 +65,7 @@ export class StructureCreationService {
           );
         }
 
-        // 2. تحديد Arkivbildare عند إنشاء Archive جديد
+        // 2. Choosing an archive_craetor when creating an archive
         let creatorId: number;
 
         if (request.archiveCreatorId !== undefined) {
@@ -115,7 +115,7 @@ export class StructureCreationService {
           creatorId = createdCreator.id;
         }
 
-        // 3. إنشاء Archive
+        // Create archive
         const now = new Date();
 
         archive = await archiveRepository.create({
@@ -135,7 +135,7 @@ export class StructureCreationService {
         });
       }
 
-      // 4. إنشاء Structure
+      // Create structure
       const now = new Date();
 
       const structure = await structureRepository.create({
@@ -155,7 +155,7 @@ export class StructureCreationService {
         updated_by: request.createdBy,
       });
 
-      // 5. ربط Structure بـ Archive
+      // 5. Link an archive to a structure
       await archiveStructureRepository.create({
         archive_id: archive.id,
         structure_id: structure.id,
@@ -164,8 +164,7 @@ export class StructureCreationService {
         created_by: request.createdBy,
       });
 
-      // عند نجاح callback، Knex ينفذ COMMIT تلقائيًا.
-      // عند حدوث خطأ، Knex ينفذ ROLLBACK تلقائيًا.
+      
       return {
         archiveCreator: createdCreator,
         archive,
