@@ -27,14 +27,12 @@ export class ClassificationService {
     private values: NodePropertyValuesRepository,
     private logger: ChangeLogRepository,
   ) {
-    this.nodeService = new NodeService(this.nodes, this.types, this.property, this.structures);
+    this.nodeService = new NodeService(nodes, types, property, structures);
   }
 
   async tree(): Promise<Array<{ structure: Structure; nodes: TreeNode[] }>> {
     const structures = await this.structures.findByType(CLASSIFICATION);
     if (structures.length === 0) return [];
-
-    console.log("Hämtar träd")
 
     const rows = await this.nodes.findByStructures(structures.map(s => s.id));
     if (rows.length === 0) {
@@ -88,10 +86,11 @@ export class ClassificationService {
     }
 
     // --- Assemble final result ---
-    return structures.map(structure => ({
+    const resultTree = structures.map(structure => ({
       structure,
       nodes: toTree(nodesByStructure.get(structure.id) ?? []),
     }));
+    return resultTree;
   }
 
   async getNode(id: number): Promise<Node> {

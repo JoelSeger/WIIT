@@ -22,14 +22,9 @@ export class NodeRepository extends CrudRepository<Node> {
   }
 
   async findByStructures(structureIds: number[]): Promise<Node[]> {
-    const nodes = [];
-    for (const id in structureIds) {
-      const node = await this.q()
-        .where(id, 'structure_id')
-        .first()
-      if (!node) throw new Error(`Node with structure_id: ${id} was not found `)
-      nodes.push(node);
-    }
+    const nodes = await this.q()
+      .whereIn('structure_id', structureIds)
+      .select('*');
     return nodes;
   }
 

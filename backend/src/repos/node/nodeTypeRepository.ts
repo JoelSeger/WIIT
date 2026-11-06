@@ -15,7 +15,7 @@ export class NodeTypeRepository extends CrudRepository<NodeType> {
 
   async findByIds(ids: number[]): Promise<NodeType[]> {
     if (ids.length === 0) return [];
-    return await this.q().whereIn("id", ids);
+    return await this.q().whereIn("id", ids).select('*');
   }
 
   async findActiveByStructureType(structureType: string): Promise<NodeType[]> {

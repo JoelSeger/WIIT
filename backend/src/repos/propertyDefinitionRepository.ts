@@ -9,6 +9,6 @@ export class PropertyDefinitionRepository extends CrudRepository<PropertyDefinit
 
   async findByIds(ids: number[]): Promise<PropertyDefinition[]> {
     if (ids.length === 0) return [];
-    return this.q().whereIn("id", ids);
+    return this.q().whereIn("id", ids).select('*');
   }
 }

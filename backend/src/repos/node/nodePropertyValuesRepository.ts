@@ -9,6 +9,7 @@ export class NodePropertyValuesRepository extends CrudRepository<NodePropertyVal
 
   async findByNodeIds(nodeIds: number[]): Promise<NodePropertyValues[]> {
     return this.q()
-      .whereIn("node_id", nodeIds);
+      .whereIn("node_id", nodeIds)
+      .select('*');
   }
 }

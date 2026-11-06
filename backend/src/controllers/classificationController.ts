@@ -7,7 +7,7 @@ export class ClassificationController extends BaseController {
     super();
   }
 
-  tree = () => async (req: Request, res: Response): Promise<void> => {
+  tree = async (req: Request, res: Response): Promise<void> => {
     try {
       const tree = await this.service.tree();
       if (tree === null) {
