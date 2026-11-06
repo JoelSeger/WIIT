@@ -1,14 +1,15 @@
 
 import type { Knex } from "knex";
 
+// camelCase, like models/archive/archiveStructure.ts: knex-stringcase maps the columns.
 export interface ArchiveStructure {
   id: number;
-  archive_id: number;
-  structure_id: number;
-  valid_from: Date | null;
-  valid_to: Date | null;
-  created_at: Date;
-  created_by: number | null;
+  archiveId: number;
+  structureId: number;
+  validFrom: Date | null;
+  validTo: Date | null;
+  createdAt?: Date;
+  createdBy: number | null;
 }
 
 export class ArchiveStructureRepository {

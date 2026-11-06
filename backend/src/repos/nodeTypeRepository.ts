@@ -13,7 +13,7 @@ export class NodeTypeRepository extends CrudRepository<NodeType> {
     return this.qb.whereIn("id", ids);
   }
 
-  // From Lilas's branch
+  // knex-stringcase returns camelCase column names, so the row keys are camelCase too.
   async findByCode(code: string): Promise<NodeType | undefined> {
     const row = await this.qb
       .where({ code, is_active: true })
@@ -25,12 +25,12 @@ export class NodeTypeRepository extends CrudRepository<NodeType> {
       id: row.id,
       code: row.code,
       name: row.name,
-      structureType: row.structure_type,
-      eadLevel: row.ead_level,
-      eadOtherlevel: row.ead_otherlevel,
-      eadUnitDescription: row.ead_unit_description,
+      structureType: row.structureType,
+      eadLevel: row.eadLevel,
+      eadOtherlevel: row.eadOtherlevel,
+      eadUnitDescription: row.eadUnitDescription,
       description: row.description,
-      isActive: row.is_active,
+      isActive: row.isActive,
     };
   }
 

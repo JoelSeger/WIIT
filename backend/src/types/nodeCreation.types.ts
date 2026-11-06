@@ -6,5 +6,8 @@ export interface CreateNodeData {
     title: string;
     sortOrder?: number;
     description?: string | null;
+    previousReferenceCode?: string | null;
+    validFrom?: string | null;
+    validTo?: string | null;
     createdBy?: number | null;
 }

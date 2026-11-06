@@ -13,6 +13,7 @@ import type { Structure } from "../models/structure/structure";
 import type {
   CreateStructureRequest,
 } from "../types/structureCreation.types";
+import { ConflictError, NotFoundError, ValidationError } from "./errorService";
 
 export interface CreateStructureResult {
   archiveCreator?: ArchiveCreator;
@@ -26,6 +27,15 @@ export class StructureCreationService {
   async create(
     request: CreateStructureRequest,
   ): Promise<CreateStructureResult> {
+    const code = request.structure.code?.trim();
+    const name = request.structure.name?.trim();
+    if (!code) throw new ValidationError("Structure code is required.");
+    if (!name) throw new ValidationError("Structure name is required.");
+
+    if (await new StructureRepository(this.knex).findByCode(code)) {
+      throw new ConflictError(`A structure with code '${code}' already exists.`);
+    }
+
     return this.knex.transaction(async (trx) => {
       const creatorRepository =
         new ArchiveCreatorRepository(this.knex, trx);
@@ -45,24 +55,20 @@ export class StructureCreationService {
       // 1. Determin wether it is an existing archive or a new one
       if (request.archiveId !== undefined) {
         if (request.newArchive) {
-          throw new Error(
-            "Provide either archiveId or newArchive, not both.",
-          );
+          throw new ValidationError("Provide either archiveId or newArchive, not both.");
         }
 
         const existingArchive =
           await archiveRepository.findById(request.archiveId);
 
         if (!existingArchive) {
-          throw new Error("Archive not found.");
+          throw new NotFoundError("Archive not found.");
         }
 
         archive = existingArchive;
       } else {
         if (!request.newArchive) {
-          throw new Error(
-            "Provide archiveId or newArchive.",
-          );
+          throw new ValidationError("Provide archiveId or newArchive.");
         }
 
         // 2. Choosing an archive_craetor when creating an archive
@@ -70,9 +76,7 @@ export class StructureCreationService {
 
         if (request.archiveCreatorId !== undefined) {
           if (request.newArchiveCreator) {
-            throw new Error(
-              "Provide either archiveCreatorId or newArchiveCreator, not both.",
-            );
+            throw new ValidationError("Provide either archiveCreatorId or newArchiveCreator, not both.");
           }
 
           const existingCreator =
@@ -81,15 +85,13 @@ export class StructureCreationService {
             );
 
           if (!existingCreator) {
-            throw new Error("Archive creator not found.");
+            throw new NotFoundError("Archive creator not found.");
           }
 
           creatorId = existingCreator.id;
         } else {
           if (!request.newArchiveCreator) {
-            throw new Error(
-              "A new archive requires an existing or a new archive creator.",
-            );
+            throw new ValidationError("A new archive requires an existing or a new archive creator.");
           }
 
           const now = new Date();
@@ -99,9 +101,9 @@ export class StructureCreationService {
             creatorType: "corporate",
             name: request.newArchiveCreator.name,
             startYear:
-              request.newArchiveCreator.start_year ?? null,
+              request.newArchiveCreator.startYear ?? null,
             endYear:
-              request.newArchiveCreator.end_year ?? null,
+              request.newArchiveCreator.endYear ?? null,
             description:
               request.newArchiveCreator.description ?? null,
             externalId: null,
@@ -121,7 +123,7 @@ export class StructureCreationService {
         archive = await archiveRepository.create({
           archiveCreatorId: creatorId,
           referenceCode:
-            request.newArchive.reference_code ?? null,
+            request.newArchive.referenceCode ?? null,
           name: request.newArchive.name,
           startYear: null,
           endYear: null,
@@ -139,29 +141,33 @@ export class StructureCreationService {
       const now = new Date();
 
       const structure = await structureRepository.create({
-        code: request.structure.code,
-        name: request.structure.name,
-        // Ska förändras sen
-        structure_type: "klassificering",
+        code,
+        name,
+        structureType: "klassificering",
         description: request.structure.description ?? null,
-        valid_from: request.structure.valid_from ?? null,
-        valid_to: request.structure.valid_to ?? null,
-        is_published: false,
+        validFrom: request.structure.validFrom ?? null,
+        validTo: request.structure.validTo ?? null,
+        isPublished: false,
+        agencyCode: request.structure.agencyCode ?? null,
+        agencyName: request.structure.agencyName ?? null,
+        languageCode: request.structure.languageCode ?? "swe",
+        license: request.structure.license ?? null,
         version: request.structure.version ?? null,
-        previous_structure_id: null,
-        created_at: now,
-        created_by: request.createdBy,
-        updated_at: now,
-        updated_by: request.createdBy,
+        previousStructureId: null,
+        externalId: request.structure.externalId ?? null,
+        createdAt: now,
+        createdBy: request.createdBy,
+        updatedAt: now,
+        updatedBy: request.createdBy,
       });
 
       // 5. Link an archive to a structure
       await archiveStructureRepository.create({
-        archive_id: archive.id,
-        structure_id: structure.id,
-        valid_from: null,
-        valid_to: null,
-        created_by: request.createdBy,
+        archiveId: archive.id,
+        structureId: structure.id,
+        validFrom: null,
+        validTo: null,
+        createdBy: request.createdBy,
       });
 
       

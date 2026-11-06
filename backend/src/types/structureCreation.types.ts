@@ -1,12 +1,12 @@
 export interface NewArchiveCreatorInput {
   name: string;
-  start_year?: number | null;
-  end_year?: number | null;
+  startYear?: number | null;
+  endYear?: number | null;
   description?: string | null;
 }
 
 export interface NewArchiveInput {
-  reference_code: string;
+  referenceCode: string;
   name: string;
 }
 
@@ -17,12 +17,18 @@ export interface NewStructureInput {
   structure_type: "klassificering";
   version?: string | null;
   description?: string | null;
-  valid_from?: Date | null;
-  valid_to?: Date | null;
+  validFrom?: Date | null;
+  validTo?: Date | null;
+  agencyCode?: string | null;
+  agencyName?: string | null;
+  languageCode?: string | null;
+  license?: string | null;
+  externalId?: string | null;
 }
 
 export interface CreateStructureRequest {
-  createdBy: number | null;// förändras när man kan skapa en användare i applikationen
+  /** Set by the controller from the logged-in user. Any value sent by the client is ignored. */
+  createdBy: number | null;
 
   // Välja en befintlig arkivbildare
   archiveCreatorId?: number;

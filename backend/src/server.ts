@@ -8,7 +8,7 @@ import { createIndexRouter } from './routers/indexRoutes';
 import { createEadExportRouter } from './ead/exportRoute';
 import { createEadImportRouter } from './ead/importRoute';
 import { createStructureCreationRoutes } from './routers/structureCreationRoute';
-import { createNodeCreationRouter } from './routers/nodeRoute';
+import { createNodeCreationRouter } from './routers/nodeCreationRoute';
 import { createNodeRouter } from './routers/nodeRoutes';
 import { createSearchRouter } from './routers/searchRoutes';
 

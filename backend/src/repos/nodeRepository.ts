@@ -81,10 +81,13 @@ export class NodeRepository extends CrudRepository<Node> {
         parent_id: data.parentId,
         node_type_id: data.nodeTypeId,
         reference_code: data.referenceCode ?? null,
+        previous_reference_code: data.previousReferenceCode ?? null,
         title: data.title,
         sort_order: data.sortOrder ?? 0,
         is_published: false,
         description: data.description ?? null,
+        valid_from: data.validFrom ?? null,
+        valid_to: data.validTo ?? null,
         created_by: data.createdBy ?? null,
         created_at: new Date(),
       })
