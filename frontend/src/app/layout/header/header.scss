@@ -1,9 +1,13 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
 // SCSS variables
 $header-background: #ffffff;
 $text-color: #000000;
 $user-background: #e6e6e6;
 $header-height: 65px;
-$logo-size: 60px;
 $profile-size: 24px;
 
 .header {
@@ -14,25 +18,19 @@ $profile-size: 24px;
   min-height: $header-height;
   padding: 0.5rem 1.25rem;
   box-sizing: border-box;
+  width: 100%;
+}
 
-  .header-logo {
+.header-logo {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
 
-    .logo {
-      width: $logo-size;
-      height: $logo-size;
-      object-fit: contain;
-      display: block;
+    .logo { 
+      height: 45px; 
+      width: auto; 
+      object-fit: contain; 
     }
-
-    .university-name {
-      font-size: 1.75rem;
-      font-weight: 600;
-      color: $text-color;
-    }
-  }
+}
 
   .header-user {
     display: flex;
@@ -45,6 +43,7 @@ $profile-size: 24px;
       padding: 5px 18px;
       font-size: 12px;
       font-weight: bold;
+      white-space: nowrap;
     }
 
     .user-button {
@@ -76,4 +75,3 @@ $profile-size: 24px;
       }
     }
   }
-}

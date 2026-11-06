@@ -1,0 +1,88 @@
+// SCSS variables for colors
+$storage-background: #f1f1f1;
+$item-background: #d9d9d9;
+$item-border: #888888;
+$text-color: #333333;
+$selected-background: #c5c5c5;
+
+// Allows the component to shrink when the side menu expands
+:host {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.storage-unit {
+  container-type: inline-size;
+  min-height: 100vh;
+  padding: 2rem 1.5rem;
+  box-sizing: border-box;
+
+  // Creates a gray upper section and white lower section
+  background: linear-gradient(
+    to bottom,
+    $storage-background 260px,
+    #ffffff 45%
+  );
+
+  h1 {
+    font-size: 24px;
+    font-weight: 400;
+    color: $text-color;
+    text-align: center;
+    margin: 0 0 5rem;
+  }
+
+  // Displays storage units in three columns
+  .storage-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    max-width: 900px;
+    margin: 0 auto;
+
+    // Stacks storage units vertically when the container becomes narrow
+    @container (max-width: 620px) {
+    grid-template-columns: 1fr;
+    max-width: 320px;
+  }
+
+  .storage-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+
+    width: 100%;
+    min-height: 40px;
+    padding: 0.65rem;
+
+    background-color: $item-background;
+    border: 1px solid $item-border;
+    color: $text-color;
+    cursor: pointer;
+
+    img {
+      width: 18px;
+      height: 18px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
+    span {
+      font-size: 12px;
+    }
+
+    &:hover {
+      background-color: #cecece;
+    }
+
+    &.selected {
+      background-color: $selected-background;
+      border: 2px solid $text-color;
+    }
+  }
+}
+}
+
+

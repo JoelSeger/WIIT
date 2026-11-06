@@ -1,17 +1,18 @@
 import { Component, HostListener, ElementRef, ViewChild } from '@angular/core';
+import { RouterLink } from '@angular/router';
+
 @Component({
-  imports: [],
+  imports: [RouterLink],
   selector: 'app-menu',
   styleUrl: './menu.scss',
   templateUrl: './menu.html',
 })
-export class Menu {
 
+export class Menu {
   @ViewChild('menuContainer') menuContainer!: ElementRef<HTMLElement>;
 
   // Tracks whether the menu is open or closed
-  isOpen = true;
-
+  isOpen = false;
   menuWidth = 350;
 
   private isResizing = false;
@@ -40,8 +41,8 @@ export class Menu {
 
     const deltaX = event.clientX - this.startX;
     const newWidth = this.startWidth + deltaX;
+    this.menuWidth = Math.max(200, Math.min(850, newWidth));
 
-    this.menuWidth = Math.max(200, Math.min(600, newWidth));
   }
   
   @HostListener('document:mouseup')

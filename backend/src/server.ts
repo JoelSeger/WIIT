@@ -9,6 +9,8 @@ import { createEadImportRouter } from './ead/importRoute';
 import { createNodeRouter } from './routers/nodeRoutes';
 import { createClassificationRouter } from './routers/classificationRouter';
 import { createIndexRouter } from './routers/indexRoutes';
+import { createSearchRouter } from './routers/searchRoutes';
+
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -27,6 +29,8 @@ app.use('/api/users', createUserRouter(db));
 // test URI only needs change!
 app.use('/api/node', createNodeRouter(db));
 app.use('/api/classification', createClassificationRouter(db));
+app.use('/api/node', createNodeRouter(db))
+app.use('/api/search', createSearchRouter(db));
 app.use('/api', createEadExportRouter({ knex: dbRaw, requireRole }));
 app.use('/api', createEadImportRouter({ knex: dbRaw, requireRole }));
 
