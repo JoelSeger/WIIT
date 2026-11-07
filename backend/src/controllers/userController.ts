@@ -4,7 +4,6 @@ import { BaseController } from "./baseController";
 import { Request, Response } from "express";
 
 export class UserController extends BaseController {
-
   constructor(private readonly userService: UserService) {
     super();
   }
