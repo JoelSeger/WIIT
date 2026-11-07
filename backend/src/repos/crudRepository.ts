@@ -33,10 +33,10 @@ export abstract class CrudRepository<T> implements Reader<T>, Writer<T> {
   }
 
   async findOne(id: string | Partial<T>): Promise<T> {
-    type Id = number | string;
-    const asWhere = <T>(id: Id | Partial<T>): object =>
-      typeof id === 'object' ? id : { id };
-    return this.q(this.db).where(asWhere).first();
+    // type Id = number | string;
+    // const asWhere = <T>(id: Id | Partial<T>): object =>
+    //   typeof id === 'object' ? id : { id };
+    return this.q(this.db).where(id).first();
   }
 
   async exists(id: string | Partial<T>): Promise<boolean> {

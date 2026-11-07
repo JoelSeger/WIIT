@@ -103,16 +103,17 @@ export class ClassificationService {
     return node;
   }
 
+  /** COMMENTED OUT UNTIL LILAS IS DONE WITH HER WORK
   async createNode(input: CreateClassificationNode, userId: number | null): Promise<Node> {
     //MAYBE ADD DTOS FOR CREATING/UPDATING NODES??
     throw new Error(`NOT IMPLEMENTED YET! WAITING FOR LILAS WORK!`)
   }
 
-  async updateNode(id: number, changes: NodeChanges, userId: number | null): Promise<Node> {
+  async updateNode(id: number, changes: updateClassificationNode, userId: number | null): Promise<Node> {
     //MAYBE ADD DTOS FOR CREATING/UPDATING NODES??
     throw new Error(`NOT IMPLEMENTED YET!`)
   }
-
+  */
   async deleteNode(id: number, userId: number | null, trx: Tx): Promise<Node> {
     const node = await this.getNode(id);
     type Entry = Omit<ChangeLog, "id" | "changedAt">

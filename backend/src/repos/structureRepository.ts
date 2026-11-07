@@ -15,7 +15,7 @@ export class StructureRepository extends CrudRepository<Structure> {
   }
 
   async findById(id: number): Promise<Structure | undefined> {
-    return super.findOne(String.apply(id));
+    return super.findOne(id.toString());
   }
 
   async findLinkedToArchive(archiveId: number, structureType: string): Promise<Structure[]> {
