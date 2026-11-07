@@ -9,12 +9,9 @@ export function createUserRouter(db: Knex): Router {
 
   const userRepository = new UserRepository(db, 'users');
   const userService = new UserService(userRepository);
-
   const userController = new UserController(userService);
 
-  router.get('/all', (req, res, next) => {
-    void userController.getAllUsers(req, res).catch(next);
-  });
+  router.get('/all', userController.getAllUsers);
 
   return router;
 }
