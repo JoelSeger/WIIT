@@ -13,6 +13,8 @@ export async function createTables(knex: Knex): Promise<void> {
   };
   await knex.schema.createTable('users', (t) => {
     t.increments('id'); t.string('ad_object_id'); t.string('username'); t.string('display_name');
+    t.string('email'); t.boolean('is_active').defaultTo(true); t.datetime('last_login_at');
+    t.datetime('created_at');
   });
   await knex.schema.createTable('archive_creators', (t) => {
     t.increments('id'); t.integer('parent_id'); t.string('creator_type').defaultTo('corporate'); t.string('name');
