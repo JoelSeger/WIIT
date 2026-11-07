@@ -2,11 +2,11 @@ import { Router } from "express";
 import type { Knex } from "knex";
 import { NodeController } from "../controllers/nodeController";
 import { NodeService } from "../services/nodeService";
-import { NodeRepository } from "../repos/nodeRepository";
-import { NodeTypeRepository } from "../repos/nodeTypeRepository";
+import { NodeRepository } from "../repos/node/nodeRepository";
 import { PropertyDefinitionRepository } from "../repos/propertyDefinitionRepository";
-import { StructureRepository } from "../repos/structureRepository";
 import { requireRole } from "../middleware/auth";
+import { NodeTypeRepository } from "../repos/node/nodeTypeRepository";
+import { StructureRepository } from "../repos/structureRepository";
 
 export function createNodeRouter(db: Knex): Router {
   const router = Router();
