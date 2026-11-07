@@ -116,11 +116,20 @@ function flatten(nodes: TreeNode[]): TreeNode[] {
   assert.deepEqual(p1.sekretess, ['OSL 21 kap. 1 §'], 'sekretess from <c><archdesc><accessrestrict>');
   assert.deepEqual(p1.gallringsforeskrifter, ['RA-FS 2021:6']);
   assert.deepEqual(p1.lank, ['https://www.mau.se/']);
-  const sekr = await knex('property_definitions as d').join('node_types as t', 't.id', 'd.node_type_id')
+  const sekr = await knex('property_definitions as d')
+    .join('node_type_properties as l', 'l.property_definition_id', 'd.id')
+    .join('node_types as t', 't.id', 'l.node_type_id')
     .where({ 't.code': 'handlingstyp', 'd.ead_element': 'accessrestrict' }).select('d.key');
   assert.deepEqual(sekr.map((r) => r.key), ['sekretess'], 'no duplicate field created');
   const svit = await knex('nodes').where({ structure_id: fe.id, external_id: 'UN-S1' }).first();
   assert.deepEqual((await props(svit.id)).placering, ['Arkivlokal Niagara']);
+  // 011: Placering exists once and is linked to both Arkivbox (seed) and Svit (import)
+  const placering = await knex('property_definitions as d')
+    .join('node_type_properties as l', 'l.property_definition_id', 'd.id')
+    .join('node_types as t', 't.id', 'l.node_type_id')
+    .where('d.key', 'placering').orderBy('t.code').select('d.id', 't.code');
+  assert.deepEqual(placering.map((r) => r.code), ['arkivbox', 'svit']);
+  assert.equal(new Set(placering.map((r) => r.id)).size, 1, 'one field, two node types');
   console.log('✓ properties: sekretess, gallring, länk, placering in the existing fields');
 
   // Relations between the trees; the unknown target is kept, not lost

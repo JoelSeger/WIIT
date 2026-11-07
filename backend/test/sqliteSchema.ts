@@ -1,6 +1,6 @@
 /**
  * The WIIT tables in SQLite, for tests that run without SQL Server.
- * Same columns as the MSSQL migrations 001–010, without MSSQL-only details
+ * Same columns as the MSSQL migrations 001–011, without MSSQL-only details
  * (filtered unique indexes, CHECK constraints, foreign keys).
  * Add a column here when a migration adds one.
  */
@@ -45,11 +45,19 @@ export async function createTables(knex: Knex): Promise<void> {
     t.integer('sort_order').defaultTo(0); t.boolean('is_published').defaultTo(false); t.string('external_id');
     t.date('valid_from'); t.date('valid_to'); t.text('description'); t.string('portal_url');
     t.datetime('source_updated_at'); t.string('source_updated_by'); audit(t);   // source_updated_*: 008
+    t.string('short_name'); t.string('public_name'); t.string('short_description');           // 011
+    t.boolean('is_under_work').defaultTo(false);
   });
   await knex.schema.createTable('property_definitions', (t) => {
-    t.increments('id'); t.integer('node_type_id'); t.string('key'); t.string('label'); t.string('data_type');
-    t.boolean('is_public').defaultTo(true); t.string('ead_element'); t.text('help_text'); t.integer('sort_order').defaultTo(0);
-    t.boolean('is_required').defaultTo(false); t.boolean('is_active').defaultTo(true); t.boolean('is_repeatable').defaultTo(false);   // 008
+    t.increments('id'); t.string('key').unique(); t.string('label'); t.string('data_type');   // key unique: 011
+    t.boolean('is_public').defaultTo(true); t.string('ead_element'); t.text('help_text');
+    t.boolean('is_active').defaultTo(true); t.boolean('is_repeatable').defaultTo(false);   // 008
+    t.string('group_label'); t.text('default_value'); t.boolean('inherits').defaultTo(false);   // 011
+  });
+  await knex.schema.createTable('node_type_properties', (t) => {        // migration 011
+    t.integer('node_type_id'); t.integer('property_definition_id');
+    t.integer('sort_order').defaultTo(0); t.boolean('is_required').defaultTo(false);
+    t.primary(['node_type_id', 'property_definition_id']);
   });
   await knex.schema.createTable('property_options', (t) => {          // migration 009
     t.increments('id'); t.integer('property_definition_id'); t.string('value');

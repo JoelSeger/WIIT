@@ -6,6 +6,7 @@ import { NodeRepository } from "../repos/nodeRepository";
 import { NodeTypeRepository } from "../repos/nodeTypeRepository";
 import { PropertyDefinitionRepository } from "../repos/propertyDefinitionRepository";
 import { StructureRepository } from "../repos/structureRepository";
+import { NodeTypePropertyRepository } from "../repos/nodeTypePropertyRepository";
 import { requireRole } from "../middleware/auth";
 
 export function createNodeRouter(db: Knex): Router {
@@ -16,6 +17,7 @@ export function createNodeRouter(db: Knex): Router {
     new NodeTypeRepository(db),
     new PropertyDefinitionRepository(db),
     new StructureRepository(db),
+    new NodeTypePropertyRepository(db),
   );
   const controller = new NodeController(service);
 

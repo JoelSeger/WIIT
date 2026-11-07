@@ -219,15 +219,23 @@ export async function loadStructure(
   if (nodeIds.length === 0) return { structure, archive, roots: [] };
 
   // Property values (only the typed column that is set is used)
+  // 011: the order of the fields belongs to the node type (node_type_properties).
+  // Left join: a value whose field is no longer linked to the node type is still exported.
   const propQuery = knex('node_property_values as v')
     .join('property_definitions as d', 'd.id', 'v.property_definition_id')
     .join('nodes as n', 'n.id', 'v.node_id')
+    .leftJoin('node_type_properties as ntp', function () {
+      this.on('ntp.node_type_id', '=', 'n.node_type_id').andOn('ntp.property_definition_id', '=', 'd.id');
+    })
     .where('n.structure_id', structureId)
     .select(
-      'v.node_id', 'd.key', 'd.label', 'd.data_type', 'd.ead_element', 'd.sort_order',
+      'v.node_id', 'd.key', 'd.label', 'd.data_type', 'd.ead_element',
+      knex.raw('COALESCE(ntp.sort_order, 0) AS sort_order'),
       'v.value_text', 'v.value_number', 'v.value_date', 'v.value_boolean',
     )
-    .orderBy([{ column: 'v.node_id' }, { column: 'd.sort_order' }]);
+    .orderBy('v.node_id')
+    .orderByRaw('COALESCE(ntp.sort_order, 0)')   // not the alias: nodes also has a sort_order column
+    .orderBy([{ column: 'd.id' }, { column: 'v.value_order' }]);
   if (publicOnly) propQuery.where('d.is_public', true);
   const propRows: PropertyQueryRow[] = await propQuery;
 

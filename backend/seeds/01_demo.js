@@ -40,6 +40,7 @@ exports.seed = async function (knex) {
   await knex('relation_types').del();
   await knex('node_property_values').del();
   await knex('property_options').del();
+  await knex('node_type_properties').del();
   await knex('property_definitions').del();
   await knex('archive_structures').del();
   await deleteTree(knex, 'nodes');            // leaves first – a parent with children is protected
@@ -121,17 +122,23 @@ exports.seed = async function (knex) {
   ]);
 
   // ---- Property definitions ----------------------------------------------------
-  const pd = (row) => insert('property_definitions', row);
-  const pAnsv = await pd({ node_type_id: process, key: 'ansvarig', label: 'Ansvarig roll', data_type: 'text', ead_element: null, sort_order: 1 });
+  // Since migration 011 a field is one row in a shared list, and node_type_properties says
+  // which node types have it (Klara's Beskrivningsfält: one field, several object types).
+  const pd = async (nodeTypeId, sortOrder, row) => {
+    const id = await insert('property_definitions', row);
+    await knex('node_type_properties').insert({ node_type_id: nodeTypeId, property_definition_id: id, sort_order: sortOrder });
+    return id;
+  };
+  const pAnsv = await pd(process, 1, { key: 'ansvarig', label: 'Ansvarig roll', data_type: 'text', ead_element: null });
 
   // Handlingstyp – fields from the client's Excel. Name and Beskrivning are nodes.title / description.
   // ead_element follows Klara's export: sekretess → accessrestrict, legal basis → appraisal.
-  const hSekr  = await pd({ node_type_id: htyp, key: 'sekretess',             label: 'Sekretess',             data_type: 'text',    ead_element: 'accessrestrict', sort_order: 1, is_public: false,
+  const hSekr  = await pd(htyp, 1, { key: 'sekretess',             label: 'Sekretess',             data_type: 'text',    ead_element: 'accessrestrict', is_public: false,
     help_text: 'Ange paragraf i OSL, t.ex. "OSL 21 kap. 1 §". Lämna tomt om ingen sekretess.' });
-  const hGallr = await pd({ node_type_id: htyp, key: 'gallringsforeskrifter', label: 'Gallringsföreskrifter', data_type: 'text',    ead_element: 'appraisal',      sort_order: 2,
+  const hGallr = await pd(htyp, 2, { key: 'gallringsforeskrifter', label: 'Gallringsföreskrifter', data_type: 'text',    ead_element: 'appraisal',
     help_text: 'Rättslig grund, t.ex. "RA-FS 2021:6". Själva gallringen görs manuellt.' });
-  const hBev   = await pd({ node_type_id: htyp, key: 'bevaras',               label: 'Bevaras / gallras',     data_type: 'enum',    ead_element: null,             sort_order: 3 });
-  const hDiar  = await pd({ node_type_id: htyp, key: 'diariefors',            label: 'Diarieförs',            data_type: 'boolean', ead_element: null,             sort_order: 4 });
+  const hBev   = await pd(htyp, 3, { key: 'bevaras',               label: 'Bevaras / gallras',     data_type: 'enum',    ead_element: null });
+  const hDiar  = await pd(htyp, 4, { key: 'diariefors',            label: 'Diarieförs',            data_type: 'boolean', ead_element: null });
   await knex('property_options').insert([
     { property_definition_id: hBev, value: 'Bevaras',              sort_order: 1 },
     { property_definition_id: hBev, value: 'Gallras',              sort_order: 2 },
@@ -139,8 +146,8 @@ exports.seed = async function (knex) {
   ]);
 
   // Förvaring
-  const sTid  = await pd({ node_type_id: svit, key: 'tidsomfang', label: 'Tidsomfång', data_type: 'text', ead_element: 'did/unitdate', sort_order: 1 });
-  const bPlac = await pd({ node_type_id: box,  key: 'placering',  label: 'Placering',  data_type: 'text', ead_element: 'did/physloc',  sort_order: 1, is_public: false,
+  const sTid  = await pd(svit, 1, { key: 'tidsomfang', label: 'Tidsomfång', data_type: 'text', ead_element: 'did/unitdate' });
+  const bPlac = await pd(box,  1, { key: 'placering',  label: 'Placering',  data_type: 'text', ead_element: 'did/physloc', is_public: false,
     help_text: 'Var boxen står, t.ex. arkivlokal och hylla.' });
 
   // ---- Helpers ------------------------------------------------------------------

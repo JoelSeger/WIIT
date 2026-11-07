@@ -4,6 +4,7 @@ import type { NodePropertyValues } from "../models/node/nodePropertyValues";
 import type { NodeRepository } from "../repos/nodeRepository";
 import type { NodeTypeRepository } from "../repos/nodeTypeRepository";
 import type { PropertyDefinitionRepository } from "../repos/propertyDefinitionRepository";
+import type { NodeTypePropertyRepository } from "../repos/nodeTypePropertyRepository";
 import type { StructureRepository } from "../repos/structureRepository";
 
 export class NodeService {
@@ -12,6 +13,7 @@ export class NodeService {
     private readonly nodeTypes: NodeTypeRepository,
     private readonly definitions: PropertyDefinitionRepository,
     private readonly structures: StructureRepository,
+    private readonly typeProperties: NodeTypePropertyRepository,
   ) {}
 
   /**
@@ -34,23 +36,32 @@ export class NodeService {
 
     const values = await this.nodes.findValuesByStructure(structureId);
 
-    const [types, defs] = await Promise.all([
-      this.nodeTypes.findByIds([...new Set(nodes.map((n) => n.nodeTypeId))]),
+    const typeIds = [...new Set(nodes.map((n) => n.nodeTypeId))];
+    const [types, defs, links] = await Promise.all([
+      this.nodeTypes.findByIds(typeIds),
       this.definitions.findByIds([...new Set(values.map((v) => v.propertyDefinitionId))]),
+      this.typeProperties.findByNodeTypes(typeIds),
     ]);
 
-    const valuesByNode = this.groupValues(values, new Map(defs.map((d) => [d.id, d])), publicOnly);
+    // 011: the order of the fields belongs to the node type, not to the field
+    const typeOfNode = new Map(nodes.map((n) => [n.id, n.nodeTypeId]));
+    const orderOf = new Map(links.map((l) => [`${l.nodeTypeId}:${l.propertyDefinitionId}`, l.sortOrder]));
+    const sortOrder = (v: NodePropertyValues): number =>
+      orderOf.get(`${typeOfNode.get(v.nodeId)}:${v.propertyDefinitionId}`) ?? 0;
+
+    const valuesByNode = this.groupValues(values, new Map(defs.map((d) => [d.id, d])), publicOnly, sortOrder);
     const typeById = new Map(types.map((t) => [t.id, t]));
 
     const roots = this.nest(nodes, typeById, valuesByNode);
     return publicOnly ? this.prunePublic(roots) : roots;
   }
 
-  /** Attaches each value to its field definition, drops non-public fields in public mode, keeps file order. */
+  /** Attaches each value to its field definition, drops non-public fields in public mode, sorts by the node type's field order. */
   private groupValues(
     values: NodePropertyValues[],
     defById: Map<number, NodeValue["definition"]>,
     publicOnly: boolean,
+    sortOrder: (v: NodePropertyValues) => number,
   ): Map<number, NodeValue[]> {
     const byNode = new Map<number, NodeValue[]>();
 
@@ -66,7 +77,7 @@ export class NodeService {
 
     for (const list of byNode.values()) {
       list.sort((a, b) =>
-        a.definition.sortOrder - b.definition.sortOrder || a.valueOrder - b.valueOrder);
+        sortOrder(a) - sortOrder(b) || a.propertyDefinitionId - b.propertyDefinitionId || a.valueOrder - b.valueOrder);
     }
     return byNode;
   }

@@ -78,7 +78,6 @@ interface NodeTypeRow {
 
 interface PropertyDefRow {
   id: number;
-  node_type_id: number;
   key: string;
   label: string;
   data_type: string;
@@ -212,7 +211,10 @@ export async function importEad(knex: Knex, input: ImportInput): Promise<ImportR
     const createdNodeTypes: string[] = [];
 
     const propertyDefs: PropertyDefRow[] = await trx('property_definitions')
-      .select('id', 'node_type_id', 'key', 'label', 'data_type', 'ead_element', 'is_repeatable');
+      .select('id', 'key', 'label', 'data_type', 'ead_element', 'is_repeatable');
+    // 011: which node types have which field (one field can belong to several node types)
+    const typeLinks: Array<{ node_type_id: number; property_definition_id: number }> =
+      await trx('node_type_properties').select('node_type_id', 'property_definition_id');
     // F3.6: the database cannot check listruta values (migration 009), so the import does
     const options: Array<{ property_definition_id: number; value: string }> = await trx('property_options')
       .where({ is_active: true }).select('property_definition_id', 'value');
@@ -252,24 +254,35 @@ export async function importEad(knex: Knex, input: ImportInput): Promise<ImportR
     };
 
     /**
-     * The field a value is stored in. A field the archivist has set up is reused (matched on
-     * EAD element first, then on key) and only a missing one is created, so Klara's values land
-     * in the fields from the client's Excel.
+     * The field a value is stored in. A field the node type already has is reused (matched on
+     * EAD element first, then on key), so Klara's values land in the fields from the client's
+     * Excel. Otherwise a field with the same key from another node type is linked to this one
+     * (011: one field, several node types), and only a key that does not exist at all creates
+     * a new field.
      */
     const definitionFor = async (nodeTypeId: number, spec: PropertySpec, multiple: boolean): Promise<PropertyDefRow> => {
-      const ofType = propertyDefs.filter((d) => d.node_type_id === nodeTypeId);
+      const linked = new Set(typeLinks.filter((l) => l.node_type_id === nodeTypeId).map((l) => l.property_definition_id));
+      const ofType = propertyDefs.filter((d) => linked.has(d.id));
       let def = (spec.eadElement && ofType.find((d) => d.ead_element === spec.eadElement))
         || ofType.find((d) => norm(d.key) === norm(spec.key));
       if (!def) {
-        const id = insertId(await trx('property_definitions').insert({
-          node_type_id: nodeTypeId, key: spec.key, label: spec.label, data_type: spec.dataType,
-          ead_element: spec.eadElement, is_public: spec.isPublic, is_repeatable: spec.repeatable || multiple,
+        def = propertyDefs.find((d) => norm(d.key) === norm(spec.key));
+        if (!def) {
+          const id = insertId(await trx('property_definitions').insert({
+            key: spec.key, label: spec.label, data_type: spec.dataType,
+            ead_element: spec.eadElement, is_public: spec.isPublic, is_repeatable: spec.repeatable || multiple,
+          }, ['id']));
+          def = { id, key: spec.key, label: spec.label, data_type: spec.dataType,
+            ead_element: spec.eadElement, is_repeatable: spec.repeatable || multiple };
+          propertyDefs.push(def);
+        }
+        await trx('node_type_properties').insert({
+          node_type_id: nodeTypeId, property_definition_id: def.id,
           sort_order: 100 + ofType.length,   // after the fields the archivist set up
-        }, ['id']));
-        def = { id, node_type_id: nodeTypeId, key: spec.key, label: spec.label, data_type: spec.dataType,
-          ead_element: spec.eadElement, is_repeatable: spec.repeatable || multiple };
-        propertyDefs.push(def);
-      } else if (multiple && !def.is_repeatable) {
+        });
+        typeLinks.push({ node_type_id: nodeTypeId, property_definition_id: def.id });
+      }
+      if (multiple && !def.is_repeatable) {
         await trx('property_definitions').where({ id: def.id }).update({ is_repeatable: true });
         def.is_repeatable = true;
       }
