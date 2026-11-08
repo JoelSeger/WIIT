@@ -11,7 +11,8 @@ export const appConfig: ApplicationConfig = {
     // Aktiverr routing som definieras i app.routes.ts
     provideRouter(routes),
 
-  // Enables HTTP requests to the backend API
+
+    // Enables HTTP requests to the backend API
     provideHttpClient()
     ]
 };

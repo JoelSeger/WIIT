@@ -6,7 +6,7 @@
  * (seeds/01_demo.js) twice, then exports and checks the result.
  *
  *   npm i -D better-sqlite3
- *   npx tsx test/ead-export.test.ts         (optional: EAD3_XSD=path/to/ead3.xsd to validate)
+ *   npx tsx test/ead-export.test.ts
  */
 
 import assert from 'node:assert/strict';
