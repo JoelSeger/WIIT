@@ -41,6 +41,7 @@ $shadow-md: 0 4px 15px rgba(0, 0, 0, 0.1);
 .archive-search {
     width: 100%;
     max-width: 650px;
+    position: relative;
 
     input {
         width: 100%;
@@ -119,4 +120,26 @@ $shadow-md: 0 4px 15px rgba(0, 0, 0, 0.1);
         border-bottom: 2px solid $text-color;
         padding-bottom: 4px;
     }
+}
+
+.search-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background-color: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  z-index: 10;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.search-suggestion {
+  padding: 0.75rem;
+  border-bottom: 1px solid #eee;
+
+  &:last-child {
+    border-bottom: none;
+  }
 }

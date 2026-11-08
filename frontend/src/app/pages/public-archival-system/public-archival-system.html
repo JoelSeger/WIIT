@@ -6,7 +6,21 @@
     <div class="archive-content">
 
         <div class="archive-search">
-            <input placeholder="Sök i arkivet..." type="text">
+            <input 
+                placeholder="Sök i arkivet..." 
+                type="text"
+                (input)="onSearch($event)"
+            >
+               <!-- Display search suggestions -->
+    @if (searchResults.length > 0) {
+        <div class="search-suggestions">
+            @for (result of searchResults; track result.nodeId) {
+                <div class="search-suggestion">
+                    <span>{{ result.title }}</span>
+                </div>
+            }
+        </div>
+    }
         </div>
 
         <div class="archive-cards">
