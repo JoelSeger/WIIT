@@ -27,6 +27,7 @@ export interface PropertyValueInput {
   publishedText?: string | null;
 }
 
+//används för att representera värden 
 export interface FormFieldValue {
   rowIndex: number;
   value: PropertyScalar;
@@ -57,7 +58,21 @@ export interface FormTab {
 export interface NodeForm {
   nodeId: number;
   nodeTypeCode: string;
+  node: NodeHeader;
   tabs: FormTab[];
+}
+
+/** The columns of the node itself, shown on the Allmänt tab next to the property fields. */
+export interface NodeHeader {
+  title: string;                      // Namn
+  referenceCode: string | null;       // Beteckning
+  previousReferenceCode: string | null; // Tidigare beteckning
+  validFrom: string | null;           // Giltig fr o m (YYYY-MM-DD)
+  validTo: string | null;             // Giltig t o m
+  description: string | null;         // Beskrivning
+  isPublished: boolean;
+  nodeTypeName: string;               // Typ (read-only, e.g. "Process")
+  structureName: string;              // Klassificeringsstruktur (read-only)
 }
 
 // ---- Activities ----------------------------------------------------------------

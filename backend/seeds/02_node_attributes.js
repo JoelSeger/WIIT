@@ -1,8 +1,10 @@
 /**
  * Fields per node level, from "Sammanfattning av information som vi behöver för att skapa struktur".
  *
- * Idempotent: an existing field only gets tab / group / has_own_published updated, so labels
- * and help texts edited in the admin UI are kept. All fields are optional (is_required = false).
+ * Idempotent: an existing field only gets tab / group / has_own_published / sort_order updated,
+ * so labels and help texts edited in the admin UI are kept. (sort_order is included so that a
+ * column added in the middle of a table, e.g. Filnamn/Länk, ends up in the right place.)
+ * All fields are optional (is_required = false).
  * Name, Beteckning, Tidigare beteckning, Giltig från/till, Beskrivning and the node type are
  * columns on `nodes`, so they are NOT property definitions.
  *
@@ -14,6 +16,7 @@ async function upsert(knex, nodeTypeId, def) {
     tab_key: def.tab_key,
     group_key: def.group_key ?? null,
     has_own_published: def.has_own_published ?? false,
+    sort_order: def.sort_order,
   };
   const existing = await knex('property_definitions')
     .where({ node_type_id: nodeTypeId, key: def.key }).first();
@@ -31,17 +34,18 @@ async function upsert(knex, nodeTypeId, def) {
     is_repeatable: def.is_repeatable ?? false,
     ead_element: def.ead_element ?? null,
     help_text: def.help_text ?? null,
-    sort_order: def.sort_order,
     is_active: true,
     ...placement,
   });
 }
 
-// Referenser – the same table on every level that has it
+// Referenser – the same table on every level that has it (columns as in Klara:
+// Titel | Filnamn/Länk | Typ | Publicera). Filnamn/Länk is plain text, not 'url': it can hold a file name.
 const REFERENCES = [
-  { key: 'referens_titel',     label: 'Titel',     data_type: 'text',    sort_order: 91 },
-  { key: 'referens_typ',       label: 'Typ',       data_type: 'text',    sort_order: 92 },
-  { key: 'referens_publicera', label: 'Publicera', data_type: 'boolean', sort_order: 93 },
+  { key: 'referens_titel',     label: 'Titel',        data_type: 'text',    sort_order: 91 },
+  { key: 'referens_lank',      label: 'Filnamn/Länk', data_type: 'text',    sort_order: 92 },
+  { key: 'referens_typ',       label: 'Typ',          data_type: 'text',    sort_order: 93 },
+  { key: 'referens_publicera', label: 'Publicera',    data_type: 'boolean', sort_order: 94 },
 ].map((d) => ({ ...d, tab_key: 'referenser', group_key: 'referens', is_repeatable: true }));
 
 // Allmänt for the three upper levels
@@ -56,15 +60,18 @@ const BY_TYPE = {
   processgrupp:      [...UPPER_GENERAL, ...REFERENCES],
   process:           [...UPPER_GENERAL, ...REFERENCES],
 
-  // Fields of a handlingsslag node (shown on the Handlingsslag tab of its process).
-  // TODO: the Beskrivningsfält table of a handlingsslag (Informationsägare …) – add the rest when known.
+  // Fields of a handlingsslag node. In Klara they are all on the Handlingsslag tab of the process
+  // (Namn, Kortnamn, Gallringsfrist, Beskrivning are nodes columns / fields below), so they all
+  // use tab_key 'handlingsslag'. Beskrivningsfält rows = fields with has_own_published
+  // (Värde | Eget | Publicerad).
+  // TODO: only Informationsägare is visible in the screenshots – add the other Beskrivningsfält rows.
+  // TODO: the unit options of Gallringsfrist (the dropdown beside the number) are unknown – text until listed.
   handlingsslag: [
-    { key: 'kortnamn',       label: 'Kortnamn, handlingsslag',     sort_order: 1, tab_key: 'allmant' },
-    { key: 'publikt_namn',   label: 'Publika handlingsslagsnamn',  sort_order: 2, tab_key: 'allmant' },
-    { key: 'gallringsfrist', label: 'Gallringsfrist (värde)',      sort_order: 3, tab_key: 'allmant', data_type: 'number' },
-    // TODO: unit options of Gallringsfrist are unknown – a text field until they are listed
-    { key: 'gallringsfrist_enhet', label: 'Gallringsfrist (enhet)', sort_order: 4, tab_key: 'allmant' },
-    { key: 'informationsagare', label: 'Informationsägare',        sort_order: 5, tab_key: 'beskrivning' },
+    { key: 'kortnamn',       label: 'Kortnamn, handlingsslag',     sort_order: 1, tab_key: 'handlingsslag' },
+    { key: 'publikt_namn',   label: 'Publika handlingsslagsnamn',  sort_order: 2, tab_key: 'handlingsslag' },
+    { key: 'gallringsfrist', label: 'Gallringsfrist (värde)',      sort_order: 3, tab_key: 'handlingsslag', data_type: 'number' },
+    { key: 'gallringsfrist_enhet', label: 'Gallringsfrist (enhet)', sort_order: 4, tab_key: 'handlingsslag' },
+    { key: 'informationsagare', label: 'Informationsägare',        sort_order: 5, tab_key: 'handlingsslag', has_own_published: true },
   ],
 
   handlingstyp: [

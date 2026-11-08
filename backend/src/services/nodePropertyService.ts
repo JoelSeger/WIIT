@@ -3,6 +3,7 @@ import { NodeRepository } from "../repos/nodeRepository";
 import { NodeTypeRepository } from "../repos/nodeTypeRepository";
 import { PropertyDefinitionRepository } from "../repos/propertyDefinitionRepository";
 import { NodePropertyRepository } from "../repos/nodePropertyRepository";
+import { StructureRepository } from "../repos/structureRepository";
 import type { PropertyDefinition } from "../models/property/propertyDefinition";
 import type { NodePropertyValues } from "../models/node/nodePropertyValues";
 import type { Node } from "../models/node/node";
@@ -12,6 +13,7 @@ import {
   type FormField,
   type FormTab,
   type NodeForm,
+  type NodeHeader,
   type PropertyScalar,
   type PropertyValueInput,
   type TabKey,
@@ -39,6 +41,7 @@ export class NodePropertyService {
     if (!node) throw new NotFoundError(`Node ${nodeId} was not found`);
 
     const nodeType = await new NodeTypeRepository(this.knex).findOne(node.nodeTypeId);
+    const structure = await new StructureRepository(this.knex).findById(node.structureId);
     const defRepo = new PropertyDefinitionRepository(this.knex);
     const defs = await defRepo.findActiveByNodeType(node.nodeTypeId);
     const options = await defRepo.findActiveOptions(defs.filter((d) => d.dataType === "enum").map((d) => d.id));
@@ -76,7 +79,21 @@ export class NodePropertyService {
       fields: byTab.get(k)!,
     }));
 
-    return { nodeId, nodeTypeCode: nodeType?.code ?? "", tabs };
+    // The columns of the node itself (Namn, Beteckning, Giltig från/till …). They are not property
+    // definitions, but the Allmänt tab shows them next to the fields, so the form carries them too.
+    const header: NodeHeader = {
+      title: node.title,
+      referenceCode: node.referenceCode ?? null,
+      previousReferenceCode: node.previousReferenceCode ?? null,
+      validFrom: this.toDateString(node.validFrom),
+      validTo: this.toDateString(node.validTo),
+      description: node.description ?? null,
+      isPublished: !!node.isPublished,
+      nodeTypeName: nodeType?.name ?? "",
+      structureName: structure?.name ?? "",
+    };
+
+    return { nodeId, nodeTypeCode: nodeType?.code ?? "", node: header, tabs };
   }
 
   // ---------------------------------------------------------------------------
@@ -191,6 +208,11 @@ export class NodePropertyService {
 
   private asTabKey(value: string | null): TabKey {
     return value && value in TAB_LABELS ? (value as TabKey) : "allmant";
+  }
+
+  private toDateString(d: unknown): string | null {
+    if (!d) return null;
+    return d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10);
   }
 
   private isEmpty(value: PropertyScalar | undefined): boolean {
