@@ -14,7 +14,6 @@ export class StructureRepository extends CrudRepository<Structure> {
   async findByCode(code: string): Promise<Structure | undefined> {
     return this.qb.where({ code }).first();
   }
-
   /** Short list for menus: no description or metadata, sorted by name. */
   async findSummaries(structureType?: string, publicOnly = false): Promise<Array<Pick<Structure,
     "id" | "code" | "name" | "structureType" | "isPublished" | "version">>> {
@@ -25,3 +24,4 @@ export class StructureRepository extends CrudRepository<Structure> {
     if (publicOnly) q.where({ isPublished: true });
     return q;
   }
+}
