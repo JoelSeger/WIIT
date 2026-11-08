@@ -11,6 +11,7 @@ import { createStructureCreationRoutes } from './routers/structureCreationRoute'
 import { createNodeCreationRouter } from './routers/nodeCreationRoute';
 import { createNodeRouter } from './routers/nodeRoutes';
 import { createSearchRouter } from './routers/searchRoutes';
+import { createStructureRouter } from './routers/structureRoutes';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -31,6 +32,7 @@ app.use('/api/node', createNodeRouter(db))
 app.use('/api/search', createSearchRouter(db));
 app.use('/api', createEadExportRouter({ knex: dbRaw, requireRole }));
 app.use('/api', createEadImportRouter({ knex: dbRaw, requireRole }));
+app.use('/api/structures', createStructureRouter(db));
 app.use("/api/structures", createStructureCreationRoutes(db));
 app.use('/api/nodes', createNodeCreationRouter(db));         // POST create
 // // Routes call next(err) (multer, import errors), so something has to answer

@@ -1,4 +1,4 @@
-import { Routes } from '@angular/router;';
+import { Routes } from '@angular/router';
 import { MainLayoutComponent } from './layout/main-layout/main-layout';
 import { LoginComponent } from './pages/login/login';
 import { Settings } from './pages/settings/settings';
@@ -21,7 +21,7 @@ export const routes: Routes = [
         { path: 'settings', component: Settings },
         { path: 'public-archival-system', component: PublicArchivalSystem },
         { path: 'archive-structure', component: ArchiveStructure },
-        { path: 'storage-unit', component: StorageUnit }
+        { path: 'storage-unit', component: StorageUnit },
         { path: 'export-archive', component: ExportArchive }
       ]
     },
