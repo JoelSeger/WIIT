@@ -11,6 +11,7 @@ import {
   TAB_LABELS,
   TAB_ORDER,
   type FormField,
+  type FormFieldValue,
   type FormTab,
   type NodeForm,
   type NodeHeader,
@@ -63,12 +64,7 @@ export class NodePropertyService {
         options: options.filter((o) => o.propertyDefinitionId === def.id).map((o) => o.value),
         values: stored
           .filter((v) => v.propertyDefinitionId === def.id)
-          .map((v) => ({
-            rowIndex: v.valueOrder,
-            value: this.readValue(def, v),
-            isOwn: v.isOwn === null || v.isOwn === undefined ? null : !!v.isOwn,
-            publishedText: v.publishedText ?? null,
-          })),
+          .map((v) => this.toFormValue(def, v)),
       };
       byTab.set(tabKey, [...(byTab.get(tabKey) ?? []), field]);
     }
@@ -89,6 +85,7 @@ export class NodePropertyService {
       validTo: this.toDateString(node.validTo),
       description: node.description ?? null,
       isPublished: !!node.isPublished,
+      rowVersion: Buffer.isBuffer(node.rowVersion) ? node.rowVersion.toString("base64") : null,
       nodeTypeName: nodeType?.name ?? "",
       structureName: structure?.name ?? "",
     };
@@ -99,6 +96,30 @@ export class NodePropertyService {
   // ---------------------------------------------------------------------------
   // Write
   // ---------------------------------------------------------------------------
+
+  /**
+   * The stored values of the given fields of one node, as the form shows them. Used to record
+   * what an edit changed (change_log). Call inside the transaction that does the edit.
+   */
+  async snapshotValues(
+    trx: Knex.Transaction,
+    node: Pick<Node, "id" | "nodeTypeId">,
+    keys: string[],
+  ): Promise<Record<string, FormFieldValue[]>> {
+    const result: Record<string, FormFieldValue[]> = {};
+    if (keys.length === 0) return result;
+
+    const defs = (await new PropertyDefinitionRepository(this.knex, trx).findActiveByNodeType(node.nodeTypeId))
+      .filter((d) => keys.includes(d.key));
+    const stored = await new NodePropertyRepository(this.knex, trx).findByNodeId(node.id);
+
+    for (const def of defs) {
+      result[def.key] = stored
+        .filter((v) => v.propertyDefinitionId === def.id)
+        .map((v) => this.toFormValue(def, v));
+    }
+    return result;
+  }
 
   /** Saves some fields of an existing node (e.g. everything on one tab). */
   async saveValues(nodeId: number, inputs: PropertyValueInput[], userId?: number | null): Promise<NodeForm> {
@@ -205,6 +226,15 @@ export class NodePropertyService {
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
+
+  private toFormValue(def: PropertyDefinition, v: NodePropertyValues): FormFieldValue {
+    return {
+      rowIndex: v.valueOrder,
+      value: this.readValue(def, v),
+      isOwn: v.isOwn === null || v.isOwn === undefined ? null : !!v.isOwn,
+      publishedText: v.publishedText ?? null,
+    };
+  }
 
   private asTabKey(value: string | null): TabKey {
     return value && value in TAB_LABELS ? (value as TabKey) : "allmant";

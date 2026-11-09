@@ -13,8 +13,10 @@ export function createNodeCreationRouter(knex: Knex): Router {
   // Creating and editing nodes is restricted to editors.
   router.post("/", requireRole("editor"), creation.createNode);
 
+  // F3.2: edit the attributes of an existing node (columns + property values, in one transaction)
+  router.patch("/:id", requireRole("editor"), properties.editNode);
+
   router.get("/:id/form", requireRole("editor"), properties.getForm);
-  router.put("/:id/properties", requireRole("editor"), properties.saveProperties);
   router.get("/:id/activities", requireRole("editor"), properties.getActivities);
     // Can be created on a process  
   router.put("/:id/activities", requireRole("editor"), properties.saveActivities);

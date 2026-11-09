@@ -3,6 +3,7 @@ import { CrudRepository } from "./crudRepository";
 import type { Node } from "../models/node/node";
 import type { NodePropertyValues } from "../models/node/nodePropertyValues";
 import type { CreateNodeData } from "../types/nodeCreation.types";
+import type { NodeAttributeChanges } from "../types/nodeEdit.types";
 
 export class NodeRepository extends CrudRepository<Node> {
   constructor(knex: Knex, trx?: Knex.Transaction) {
@@ -72,6 +73,46 @@ export class NodeRepository extends CrudRepository<Node> {
 
     const row = await query.first();
     return row !== undefined;
+  }
+
+  /**
+   * Reference codes are unique per structure (uq_nodes_structure_reference_code), so an edit is
+   * checked against the whole structure – not only against the siblings – and the node itself
+   * is left out of the check.
+   */
+  async existsReferenceCodeInStructure(
+    structureId: number,
+    referenceCode: string,
+    excludeNodeId: number,
+  ): Promise<boolean> {
+    const row = await this.qb
+      .where({ structureId, referenceCode })
+      .whereNot({ id: excludeNodeId })
+      .first();
+    return row !== undefined;
+  }
+
+  /**
+   * Updates the editable columns of one node and stamps updated_at / updated_by.
+   * With expectedRowVersion the update only goes through if nobody changed the row in the
+   * meantime (optimistic locking, nodes.row_version). Returns false when no row was updated.
+   * Call inside a transaction.
+   */
+  async updateAttributes(
+    id: number,
+    changes: NodeAttributeChanges,
+    updatedBy: number | null,
+    expectedRowVersion?: Buffer | null,
+  ): Promise<boolean> {
+    const query = this.qb.where({ id });
+    if (expectedRowVersion) query.andWhere({ rowVersion: expectedRowVersion });
+
+    const count = await query.update({
+      ...changes,
+      updatedAt: new Date(),
+      updatedBy,
+    });
+    return Number(count) > 0;
   }
 
   async createNode(data: CreateNodeData): Promise<Node> {

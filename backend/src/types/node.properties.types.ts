@@ -71,6 +71,8 @@ export interface NodeHeader {
   validTo: string | null;             // Giltig t o m
   description: string | null;         // Beskrivning
   isPublished: boolean;
+  /** Version of the node row (base64). Send it back when saving to detect edits by someone else. */
+  rowVersion: string | null;
   nodeTypeName: string;               // Typ (read-only, e.g. "Process")
   structureName: string;              // Klassificeringsstruktur (read-only)
 }
