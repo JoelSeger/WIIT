@@ -1,8 +1,9 @@
 import { Component, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { LoginService } from '../../core/services/login.service';
 
 @Component({
-  imports: [],
+  imports: [RouterLink],
   standalone: true,
   selector: 'app-header',
   styleUrl: './header.scss',
