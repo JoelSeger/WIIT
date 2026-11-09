@@ -1,10 +1,12 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ImportResponse, ImportArchiveService } from '../../core/services/import-archive';
 
 @Component({
-  imports: [CommonModule, RouterLink],
+  // FormsModule behövs för (ngSubmit) på <form>, annars laddas sidan om vid submit
+  imports: [CommonModule, FormsModule, RouterLink],
   standalone: true,
   selector: 'app-import-archive',
   styleUrl: './import-archive.scss',
@@ -49,8 +51,9 @@ export class ImportArchiveComponent {
   }
 
   private handleFile(file: File) {
-    if (!file.name.toLowerCase().endsWith('.xml') && !file.name.toLowerCase().endsWith('.ead')) {
-      this.errorMessage.set('Endast XML- eller EAD-filer är tillåtna.');
+
+    if (!/\.(xml|ead|ead3)$/i.test(file.name)) {
+      this.errorMessage.set('Endast .xml-, .ead- och .ead3-filer är tillåtna.');
       return;
     }
 
@@ -65,27 +68,28 @@ export class ImportArchiveComponent {
       return;
     }
 
-      this.isUploading.set(true);
-      this.errorMessage.set(null);
-      this.importResult.set(null);
+    this.isUploading.set(true);
+    this.errorMessage.set(null);
+    this.importResult.set(null);
 
-      this.importService.uploadEadFile(this.selectedFile).subscribe({
-        next: (response) => {
-          this.isUploading.set(false);
-          this.importResult.set(response);
-          this.selectedFile = null;
-        },
-
-        error: (err) => {
-          this.isUploading.set(false);
-          if (err.status === 409) {
-            this.errorMessage.set(err.error?.message || 'Filen finns redan.');
-          } else if (err.status === 400) {
-            this.errorMessage.set(err.error?.message || 'Filen är felaktig eller korrupt.');
-          } else {
-            this.errorMessage.set('Ett oväntat fel uppstod.');
-          }
+    this.importService.uploadEadFile(this.selectedFile).subscribe({
+      next: (response) => {
+        this.isUploading.set(false);
+        this.importResult.set(response);
+        this.selectedFile = null;
+      },
+      error: (err) => {
+        this.isUploading.set(false);
+        if (err.status === 409) {
+          this.errorMessage.set(err.error?.error || 'Filen finns redan.');
+        } else if (err.status === 400) {
+          this.errorMessage.set(err.error?.error || 'Filen är felaktig eller korrupt.');
+        } else if (err.status === 403) {
+          this.errorMessage.set('Du saknar behörighet att importera.');
+        } else {
+          this.errorMessage.set(err.error?.error || 'Ett oväntat fel uppstod.');
         }
-      });
-    }
+      },
+    });
   }
+}
