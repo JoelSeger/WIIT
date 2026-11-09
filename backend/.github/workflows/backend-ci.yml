@@ -1,0 +1,53 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [ develop ]
+
+permissions:
+  contents: read
+  checks: write
+  actions: read
+
+jobs:
+  test:
+    name: Test & Report
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - - name: Setup Node.js
+      - uses: actions/setup-node@v4
+      - with:
+      - node-version: '20'
+      - cache: 'npm'
+      - cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test:ci
+
+      - name: Summarize test results
+        if: ${{ !cancelled() }}
+        run: npm run report:summarize
+
+      - name: Publish test report
+        uses: dorny/test-reporter@v2
+        if: ${{ !cancelled() }}
+        with:
+          name: JEST Tests
+          path: src/unit_tests/reports/junit.xml
+          reporter: jest-junit
+
+      - name: Upload test report as artifact
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: test-results
+          path: |
+            src/unit_tests/reports/junit.xml
+            src/unit_tests/reports/test-summary.md
