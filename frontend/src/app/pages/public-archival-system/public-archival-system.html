@@ -11,17 +11,26 @@
                 type="text"
                 (input)="onSearch($event)"
             >
-               <!-- Display search suggestions -->
+               
     @if (searchResults.length > 0) {
         <div class="search-suggestions">
             @for (result of searchResults; track result.nodeId) {
-                <div class="search-suggestion">
-                    <span>{{ result.title }}</span>
-                </div>
+                <button
+                type="button"
+                class="search-suggestion"
+                (click)="selectSearchResult(result)"
+                >
+                <span>{{ result.title }}</span>
+                </button>
             }
         </div>
-    }
-        </div>
+
+    } @else if (searchCompleted && searchText.trim().length >= 3) {
+  
+    <p class="no-results">Inga sökresultat hittades</p>
+  
+}
+  </div>
 
         <div class="archive-cards">
             <button type="button">

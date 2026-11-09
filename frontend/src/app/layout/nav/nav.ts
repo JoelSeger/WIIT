@@ -1,6 +1,10 @@
-import { Component, inject, output, HostListener, ElementRef } from '@angular/core';
+import { Component, inject, output, HostListener, ElementRef, DestroyRef, ChangeDetectorRef } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LoginService } from '../../core/services/login.service';
+import { SearchService } from '../../services/search.service';
+import { SearchResult } from '../../models/search';
+import { Subject, debounceTime, distinctUntilChanged, switchMap, of, catchError } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 @Component({
   imports: [RouterLink],
@@ -42,38 +46,57 @@ export class Nav {
     console.log('Logout button clicked');
   }
 
-  // tillfällig testdata innan vi kopplar till backend
-  searchItems: string[] = [
-    'Arkivförteckning 2016 - 2023',
-    'Arkivförteckning 2024 -',
-    'Förvaringsenheter',
-    'Förvaring',
-    'Struktur',
-    'Verksamhetssystem'
-  ];
 
   searchText = '';
-  searchSuggestions: string[] = [];
+  searchSuggestions: SearchResult[] = [];
+  searchCompleted: boolean = false;
+
+  private searchSubject = new Subject<string>();
+  private searchService = inject(SearchService);
+  private destroyRef = inject(DestroyRef);
+  private cdr = inject(ChangeDetectorRef);
+
+  // Handles search requests with debounce
+  ngOnInit(): void {
+    this.searchSubject.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(query => {
+        if (query.length < 3) {
+          return of(null);
+        }
+
+        return this.searchService.search(query).pipe(
+          catchError(error => {
+            console.error('Search failed:', error);
+            return of(null);
+          })
+        );
+      }),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(response => {
+      this.searchSuggestions = response?.results ?? [];
+      this.searchCompleted = response !== null;
+      this.cdr.detectChanges();
+    });
+  }
 
   onSearch(event: Event): void {
     const input = event.target as HTMLInputElement;
     this.searchText = input.value;
 
-    if (this.searchText.trim().length < 2) {
+    this.searchCompleted = false;
+
+    if (this.searchText.trim().length < 3) {
       this.searchSuggestions = [];
-      return;
     }
-
-    this.searchSuggestions = this.searchItems.filter(item =>
-      item.toLowerCase().includes(this.searchText.trim().toLowerCase())
-    );
-
-    console.log(this.searchSuggestions);
+    this.searchSubject.next(this.searchText.trim());
   }
 
   
-  selectSuggestion(item: string): void {
-    this.searchText = item;
+  selectSuggestion(result: SearchResult): void {
+    console.log('Selected search result:', result);
+    this.searchText = result.title;
     this.searchSuggestions = [];
   }
 
