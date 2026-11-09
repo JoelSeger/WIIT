@@ -1,7 +1,7 @@
 import { Component, inject, DestroyRef, ChangeDetectorRef } from '@angular/core';
 import { SearchService } from '../../services/search.service';
 import { SearchResult } from '../../models/search';
-import { Subject, debounceTime, distinctUntilChanged, switchMap, of } from 'rxjs';
+import { Subject, debounceTime, distinctUntilChanged, switchMap, of, catchError } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 
@@ -29,9 +29,16 @@ export class PublicArchivalSystem {
       debounceTime(300),
       distinctUntilChanged(),
       switchMap(query => {
-        return query.length >= 3
-          ? this.searchService.search(query)
-          : of(null);
+        if (query.length < 3) {
+          return of(null);
+        }
+        // catchError keeps the search working after a failed request
+        return this.searchService.search(query).pipe(
+          catchError(error => {
+            console.error('Search failed:', error);
+            return of(null);
+          })
+        );
       }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe(response => {

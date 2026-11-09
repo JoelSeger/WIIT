@@ -35,6 +35,8 @@ $hover-background: rgba(0, 0, 0, 0.1);
     background-color: white;
     border: 1px solid #cccccc;
     z-index: 100;
+    max-height: 300px;
+    overflow-y: auto;
 
     button {
       display: block;
@@ -47,6 +49,12 @@ $hover-background: rgba(0, 0, 0, 0.1);
 
       &:hover {
         background-color: #eeeeee;
+      }
+
+      .result-structure {
+        display: block;
+        color: #666666;
+        font-size: 12px;
       }
     }
   }

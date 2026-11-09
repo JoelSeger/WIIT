@@ -170,6 +170,12 @@ $shadow-md: 0 4px 15px rgba(0, 0, 0, 0.1);
   &:last-child {
     border-bottom: none;
   }
+
+  .result-structure {
+    display: block;
+    color: #666;
+    font-size: 12px;
+  }
 }
 
 .no-results {
