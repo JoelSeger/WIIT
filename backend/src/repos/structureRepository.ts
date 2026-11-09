@@ -10,4 +10,15 @@ export class StructureRepository extends CrudRepository<Structure> {
   async findById(id: number): Promise<Structure | undefined> {
     return this.qb.where({ id }).first();
   }
+
+  /** Short list for menus: no description or metadata, sorted by name. */
+  async findSummaries(structureType?: string, publicOnly = false): Promise<Array<Pick<Structure,
+    "id" | "code" | "name" | "structureType" | "isPublished" | "version">>> {
+    const q = this.qb
+      .select("id", "code", "name", "structureType", "isPublished", "version")
+      .orderBy("name");
+    if (structureType) q.where({ structureType });
+    if (publicOnly) q.where({ isPublished: true });
+    return q;
+  }
 }
