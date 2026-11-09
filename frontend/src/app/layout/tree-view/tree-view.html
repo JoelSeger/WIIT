@@ -1,1 +1,32 @@
-<p>tree-view works!</p>
+<div class="tree-container">
+
+    @if (isLoading()) {
+    <div class="loading">Laddar struktur...</div>
+    } @else if (hasError()) {
+    <div class="loading">Kunde inte ladda trädet.</div>
+    } @else {
+
+    @for (node of flatNodes(); track node.id) {
+    <!-- Här skapas trappan med hjälp av node.level * 24 pixlar -->
+    <div class="tree-row" [style.padding-left.px]="node.level * 24">
+
+        <!-- 1. Expanderingspil -->
+        <div class="toggle-container" (click)="node.hasChildren ? toggle(node.id, $event) : null">
+            @if (node.hasChildren) {
+            <span class="chevron" [class.expanded]="node.isExpanded">▶</span>
+            }
+        </div>
+
+        <!-- 2. Ikon -->
+        <img [src]="getIcon(node)" class="node-icon" alt="ikon" />
+
+        <!-- 3. Text (Titel) -->
+        <span class="node-label" (click)="selectNode(node)">
+            {{ getLabel(node) }}
+        </span>
+
+    </div>
+    }
+
+    }
+</div>

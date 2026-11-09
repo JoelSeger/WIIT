@@ -1,0 +1,70 @@
+.tree-container {
+  display: flex;
+  flex-direction: column;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  color: #1a5090;
+  padding-top: 10px;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-right: 10px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+
+  // Grå bakgrund när man hovrar över en rad
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+}
+
+// Ytan för pilen
+.toggle-container {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 4px;
+  
+  .chevron {
+    font-size: 10px;
+    color: #1a5090;
+    transition: transform 0.2s ease;
+    display: inline-block;
+    
+    // När klassen "expanded" läggs på (av Angular), snurra pilen 90 grader
+    &.expanded {
+      transform: rotate(90deg); 
+    }
+  }
+}
+
+// Ikonerna
+.node-icon {
+  width: 16px;      
+  height: 16px;
+  margin-right: 8px;
+  object-fit: contain;
+  display: block;
+}
+
+// Texten
+.node-label {
+  white-space: nowrap;
+  
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.loading {
+  padding: 10px;
+  color: #666;
+  font-style: italic;
+}
