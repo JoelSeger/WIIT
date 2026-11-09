@@ -25,7 +25,7 @@ export class ExportArchive {
   this.notificationType = type;
   this.showNotification = true;
 }
-    
+
 exportArchive(): void {
   if (this.exportType !== 'archive') {
     this.showPopup('Det valda exportalternativet stöds inte ännu.', 'error');
@@ -40,8 +40,9 @@ exportArchive(): void {
   }
 
   this.http.get(`/api/structures/${encodeURIComponent(id)}/export/ead3`, {
-  responseType: 'blob',
-  observe: 'response'
+    params: { full: 'true' },
+    responseType: 'blob',
+    observe: 'response'
   }).subscribe({
     next:(response) => {
   const file = response.body;
@@ -55,7 +56,7 @@ exportArchive(): void {
       const link = document.createElement('a');
 
       link.href = url;
-      const header = response.headers.get('Content-Disposition'); 
+      const header = response.headers.get('Content-Disposition');
       let filename = 'arkivexport.xml';
 
       if (header && header.includes('filename=')) {
