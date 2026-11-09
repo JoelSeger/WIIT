@@ -21,6 +21,12 @@
   &:hover {
     background-color: rgba(0, 0, 0, 0.05);
   }
+
+  // Vald nod
+  &.selected {
+    background-color: rgba(26, 80, 144, 0.12);
+    font-weight: 600;
+  }
 }
 
 // Ytan för pilen

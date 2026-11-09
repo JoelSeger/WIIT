@@ -9,19 +9,33 @@
 
   @if (isOpen) {
   <div class="menu-inner">
-    
+
     <div class="menu-content">
       @if (isLoadingStructures()) {
         <div class="loading-text">Laddar strukturer...</div>
       } @else if (structureError()) {
         <div class="error-text">Kunde inte ladda strukturer.</div>
       } @else if (selectedStructureId()) {
-        <app-tree-view 
-          [structureId]="selectedStructureId()!" 
+
+        @if (structures().length > 1) {
+          <label class="structure-select">
+            <span>Struktur</span>
+            <select (change)="onStructureChange($event)">
+              @for (s of structures(); track s.id) {
+                <option [value]="s.id" [selected]="s.id === selectedStructureId()">
+                  {{ s.name }} ({{ structureTypeLabel(s.structureType) }})
+                </option>
+              }
+            </select>
+          </label>
+        }
+
+        <app-tree-view
+          [structureId]="selectedStructureId()!"
           (nodeSelected)="onNodeSelected($event)">
         </app-tree-view>
       } @else {
-        <div class="loading-text">Inga strukturer hittades.</div>
+        <div class="loading-text">Inga publicerade strukturer hittades.</div>
       }
     </div>
 
@@ -31,7 +45,7 @@
         <span>Inställningar</span>
       </a>
     </div>
-    
+
   </div>
 
   <div class="resize-handle" (mousedown)="startResize($event)"></div>

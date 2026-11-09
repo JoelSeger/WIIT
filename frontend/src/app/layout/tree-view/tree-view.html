@@ -1,14 +1,21 @@
-<div class="tree-container">
+<div class="tree-container" role="tree">
 
     @if (isLoading()) {
     <div class="loading">Laddar struktur...</div>
     } @else if (hasError()) {
     <div class="loading">Kunde inte ladda trädet.</div>
+    } @else if (flatNodes().length === 0) {
+    <div class="loading">Strukturen är tom.</div>
     } @else {
 
     @for (node of flatNodes(); track node.id) {
-    <!-- Här skapas trappan med hjälp av node.level * 24 pixlar -->
-    <div class="tree-row" [style.padding-left.px]="node.level * 24">
+    <!-- Indrag: node.level * 24 pixlar -->
+    <div class="tree-row"
+        role="treeitem"
+        [attr.aria-level]="node.level + 1"
+        [attr.aria-expanded]="node.hasChildren ? node.isExpanded : null"
+        [class.selected]="node.id === selectedId()"
+        [style.padding-left.px]="node.level * 24">
 
         <!-- 1. Expanderingspil -->
         <div class="toggle-container" (click)="node.hasChildren ? toggle(node.id, $event) : null">
@@ -18,10 +25,12 @@
         </div>
 
         <!-- 2. Ikon -->
-        <img [src]="getIcon(node)" class="node-icon" alt="ikon" />
+        <img [src]="getIcon(node)" class="node-icon" alt="" />
 
-        <!-- 3. Text (Titel) -->
-        <span class="node-label" (click)="selectNode(node)">
+        <!-- 3. Referenskod + titel -->
+        <span class="node-label" tabindex="0"
+            (click)="selectNode(node)"
+            (keydown.enter)="selectNode(node)">
             {{ getLabel(node) }}
         </span>
 

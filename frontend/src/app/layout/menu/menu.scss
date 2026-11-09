@@ -132,4 +132,21 @@ $text-color: #333333;
   color: #d32f2f;
   font-size: 14px;
 }
+
+  .structure-select {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0 10px 10px;
+    font-size: 13px;
+    color: $text-color;
+
+    select {
+      padding: 4px 6px;
+      font-size: 13px;
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      background: #fff;
+    }
+  }
 }
