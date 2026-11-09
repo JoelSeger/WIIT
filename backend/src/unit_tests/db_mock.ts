@@ -1,10 +1,9 @@
 import knex, { type Knex } from 'knex';
 
 /**
- * Creates an isolated SQLite database for endpoint tests.
- *
- * This is a test schema, not an execution of the SQL Server migrations. Keep its
- * columns aligned with the tables used by the routes and repositories under test.
+Creates an isolated SQLite database for endpoint tests.
+This is a test schema, not an execution of the SQL Server migrations. Keep its
+columns aligned with the tables used by the routes and repositories under test.
  */
 export async function createTestDb(): Promise<Knex> {
   const db = knex({
@@ -119,14 +118,12 @@ async function createTestSchema(db: Knex): Promise<void> {
   });
 }
 /**
- * Registers beforeAll/afterAll hooks that create and destroy a fresh
- * in-memory SQLite DB for the current describe block.
- *
- * Must be called INSIDE a `describe(...)` block - it relies on Jest's
- * lifecycle globals, which only exist in a test-file context.
- *
+  Registers beforeAll/afterAll hooks that create and destroy a fresh
+  in-memory SQLite DB for the current describe block.
+  Must be called INSIDE a `describe(...)` block - it relies on Jest's
+  lifecycle globals, which only exist in a test-file context.
+
  * Usage:
- *
  *   describe('UserRepository', () => {
  *     const getDb = useTestDb();
  *     let repo: UserRepository;
@@ -136,6 +133,7 @@ async function createTestSchema(db: Knex): Promise<void> {
  *     it('finds a user', async () => { ... });
  *   });
  */
+
 export function useTestDb(): () => Knex {
   let db: Knex | undefined;
 
