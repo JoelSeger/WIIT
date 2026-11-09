@@ -41,7 +41,7 @@
       <input
         id="archive"
         type="text"
-        placeholder="Ex. Verksamhetsförteckning 2024-"
+        placeholder="Ange ett struktur-ID"
         [(ngModel)]="selectedArchive"
       >
 
@@ -61,8 +61,18 @@
       <small>Formatet är förvalt och kan inte ändras.</small>
     </div>
 
-    <button class="export-button" type="button">
+    <button 
+    class="export-button" 
+    type="button" 
+    (click)="exportArchive()">
       Granska export / Exportera
     </button>
+    @if (showNotification) {
+  <app-notification-popup
+    [type]="notificationType"
+    [message]="notificationMessage"
+    (closed)="showNotification = false">
+  </app-notification-popup>
+}
   </div>
 </main>
