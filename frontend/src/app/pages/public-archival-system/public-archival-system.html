@@ -6,8 +6,32 @@
     <div class="archive-content">
 
         <div class="archive-search">
-            <input placeholder="Sök i arkivet..." type="text">
+            <input 
+                placeholder="Sök i arkivet..." 
+                type="text"
+                (input)="onSearch($event)"
+            >
+               
+    @if (searchResults.length > 0) {
+        <div class="search-suggestions">
+            @for (result of searchResults; track result.nodeId) {
+                <button
+                type="button"
+                class="search-suggestion"
+                (click)="selectSearchResult(result)"
+                >
+                <span>{{ result.referenceCode ? result.referenceCode + ' ' : '' }}{{ result.title }}</span>
+                <small class="result-structure">{{ result.structureName }}</small>
+                </button>
+            }
         </div>
+
+    } @else if (searchCompleted && searchText.trim().length >= 3) {
+  
+    <p class="no-results">Inga sökresultat hittades</p>
+  
+}
+  </div>
 
         <div class="archive-cards">
             <button type="button">

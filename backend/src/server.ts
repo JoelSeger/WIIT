@@ -25,14 +25,12 @@ app.use(attachUser);
 
 app.use('/', createIndexRouter());
 app.use('/api/users', createUserRouter(db));
-// test URI only needs change!
 app.use('/api/node', createNodeRouter(db))
 app.use('/api/search', createSearchRouter(db));
 app.use('/api', createEadExportRouter({ knex: dbRaw, requireRole }));
 app.use('/api', createEadImportRouter({ knex: dbRaw, requireRole }));
 app.use('/api/structures', createStructureRouter(db));
 
-// Routes call next(err) (multer, import errors), so something has to answer
 app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
   res.status(err.status ?? 500).json({ success: false, error: err.message });

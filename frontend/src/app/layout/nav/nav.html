@@ -29,15 +29,19 @@
 
     @if (searchSuggestions.length > 0) {
       <div class="search-suggestions">
-        @for (item of searchSuggestions; track item) {
+        @for (result of searchSuggestions; track result.nodeId) {
           <button
             type="button"
-            (click)="selectSuggestion(item)"
+            (click)="selectSuggestion(result)"
           >
-            {{ item }}
+            <span>{{ result.referenceCode ? result.referenceCode + ' ' : '' }}{{ result.title }}</span>
+            <small class="result-structure">{{ result.structureName }}</small>
           </button>
         }
         </div>
+        } @else if (searchCompleted && searchText.trim().length >= 3) {
+
+    <p class="no-results">Inga sökresultat hittades</p>
       }
       </div>
     
