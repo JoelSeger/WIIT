@@ -65,7 +65,7 @@
                 <h3>Skapade strukturer:</h3>
                 <ul>
                     @for (structure of result.structures; track structure.id) {
-                        <li>{{ structure.name }} <span>({{ structure.nodeCount }} noder)</span></li>
+                      <li>{{ structure.name }} <span>(id {{ structure.id }}, {{ structure.nodeCount }} noder)</span></li>
                     }
                 </ul>
             </div>
