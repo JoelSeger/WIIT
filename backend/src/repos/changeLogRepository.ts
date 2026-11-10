@@ -27,4 +27,23 @@ export class ChangeLogRepository extends CrudRepository<ChangeLog> {
       changedAt: new Date(),
     });
   }
+  /** The deleted node is kept in old_value, because the row itself is gone afterwards. */
+  async logNodeDelete(entry: {
+    nodeId: number;
+    structureId: number;
+    oldValue: unknown;
+    changedBy: number | null;
+  }): Promise<void> {
+    await this.qb.insert({
+      entityType: "node",
+      entityId: entry.nodeId,
+      structureId: entry.structureId,
+      action: "delete",
+      oldValue: JSON.stringify(entry.oldValue),
+      newValue: null,
+      comment: null,
+      changedBy: entry.changedBy,
+      changedAt: new Date(),
+    });
+  }
 }

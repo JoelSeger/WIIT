@@ -27,3 +27,10 @@ export function isUniqueViolation(error: unknown): boolean {
   const n = e?.number ?? e?.originalError?.number;
   return n === 2601 || n === 2627 || e?.code === "SQLITE_CONSTRAINT_UNIQUE";
 }
+
+/** SQL Server foreign-key violation (547), read from the driver error. */
+export function isForeignKeyViolation(error: unknown): boolean {
+  const e = error as { number?: number; originalError?: { number?: number }; code?: string };
+  const n = e?.number ?? e?.originalError?.number;
+  return n === 547 || e?.code === "SQLITE_CONSTRAINT_FOREIGNKEY";
+}

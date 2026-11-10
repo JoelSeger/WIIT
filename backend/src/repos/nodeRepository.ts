@@ -50,6 +50,12 @@ export class NodeRepository extends CrudRepository<Node> {
     return rows.map((row: any) => this.mapNode(row));
   }
 
+  /** true if at least one node has this node as its parent (F3.1: only leaf nodes can be deleted). */
+  async hasChildren(id: number): Promise<boolean> {
+    const row = await this.qb.where({ parentId: id }).first();
+    return row !== undefined;
+  }
+
   async findRootNodes(structureId: number): Promise<Node[]> {
     const rows = await this.qb
       .where({ structure_id: structureId, parent_id: null })

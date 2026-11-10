@@ -39,4 +39,17 @@ export class NodeActivityRepository extends CrudRepository<NodeActivity> {
       handlingstypNodeIds.map((handlingstypNodeId) => ({ activityId, handlingstypNodeId })),
     );
   }
+
+  /**
+   * true if the node is used by an activity as a strukturenhet or ticked as a handlingstyp.
+   * Both foreign keys are NO ACTION, so such a node cannot be deleted. Call this after the
+   * node's own activities have been removed, so they do not count as "other" users.
+   */
+  async isReferenced(nodeId: number): Promise<boolean> {
+    const db = this.trx ?? this.knex;
+    const asUnit = await db("node_activities").where("structure_unit_node_id", nodeId).first();
+    if (asUnit) return true;
+    const asType = await db("node_activity_handlingstyp").where("handlingstyp_node_id", nodeId).first();
+    return asType !== undefined;
+  }
 }
