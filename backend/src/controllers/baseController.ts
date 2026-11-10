@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import logger from '../config/logger';
+import { User } from '../models/user';
 
 
 /**
@@ -7,23 +7,22 @@ import logger from '../config/logger';
  */
 export abstract class BaseController {
 
-  protected unauthorized(res: Response, error: Error): void {
-    logger.warn(error);
-    res.status(401).json({ error: error.message });
+  protected unauthorized(res: Response, message: string = "Unauthorized"): void {
+    //TODO: ADD LOGGER HERE
+    res.status(401).json({ error: message });
   }
 
-  protected forbidden(res: Response, error: Error): void {
-    logger.warn(error);
-    res.status(403).json({ error: error.message });
+  protected forbidden(res: Response, message: string = "Forbidden"): void {
+    //TODO: ADD LOGGER HERE
+    res.status(403).json({ error: message });
   }
 
   protected success<T>(res: Response, data: T, message?: string): void {
-    logger.info(message);
     res.json({ success: true, data, message });
   }
 
-  protected error(res: Response, error: Error, statusCode: number = 500): void {
-    logger.error(error);
-    res.status(statusCode).json({ success: false, error: error.message });
+  protected error(res: Response, message: string, statusCode: number = 500): void {
+    //ADD LOGGER HERE
+    res.status(statusCode).json({ success: false, error: message });
   }
 }

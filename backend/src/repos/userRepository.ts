@@ -10,8 +10,9 @@ export class UserRepository extends CrudRepository<User> {
   async getAll(limit: number, offset: number): Promise<User[]> {
     const users = await super.findAll(limit, offset);
     if (!users) {
-      return [];
+      throw new Error("No Users found!")
     }
+    console.log("DB RESULT:", users);
     return users;
   }
 

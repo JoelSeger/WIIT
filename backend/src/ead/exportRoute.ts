@@ -18,7 +18,6 @@ import express, { type NextFunction, type Request, type RequestHandler, type Res
 import type { Knex } from 'knex';
 import { loadStructure, type TreeNode } from './loadStructure';
 import { buildEad3 } from './buildEad3';
-import logger from '../config/logger';
 
 /** What the auth middleware puts on req. Move this to src/middleware/auth.ts once that exists. */
 export interface AuthUser {
@@ -82,7 +81,6 @@ export function createEadExportRouter({ knex, requireRole }: EadExportDeps): Rou
       res.set('Content-Disposition', `attachment; filename="${fileName}"`);
       res.send(xml);
     } catch (err) {
-      logger.error(err);
       const message = err instanceof Error ? err.message : String(err);
       if (jobId != null) await finish(knex, jobId, 'failed', null, message.slice(0, 4000)).catch(() => {});
       next(err);

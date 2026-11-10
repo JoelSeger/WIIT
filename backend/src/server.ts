@@ -10,7 +10,6 @@ import { createEadImportRouter } from './ead/importRoute';
 import { createNodeRouter } from './routers/nodeRoutes';
 import { createSearchRouter } from './routers/searchRoutes';
 import { createStructureRouter } from './routers/structureRoutes';
-import logger from './config/logger';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -24,15 +23,6 @@ app.use(session({
 }));
 app.use(attachUser);
 
-app.use((req, res, next) => {
-  const start = Date.now();
-  res.on('finish', () => {
-    logger.info({ method: req.method, url: req.originalUrl, status: res.statusCode,
-      ms: Date.now() - start, userId: req.user?.id }, 'request');
-  });
-  next();
-});
-
 app.use('/', createIndexRouter());
 app.use('/api/users', createUserRouter(db));
 app.use('/api/node', createNodeRouter(db))
@@ -41,8 +31,8 @@ app.use('/api', createEadExportRouter({ knex: dbRaw, requireRole }));
 app.use('/api', createEadImportRouter({ knex: dbRaw, requireRole }));
 app.use('/api/structures', createStructureRouter(db));
 
-app.use((err: Error & { status?: number }, req: Request, res: Response, _next: NextFunction) => {
-  logger.error({ err, method: req.method, url: req.originalUrl, userId: req.user?.id }, 'Unhandled error');
+app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
+  console.error(err);
   res.status(err.status ?? 500).json({ success: false, error: err.message });
 });
 
