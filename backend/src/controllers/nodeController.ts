@@ -10,19 +10,19 @@ export class NodeController extends BaseController {
   getTree = (publicOnly: boolean) => async (req: Request, res: Response): Promise<void> => {
     const structureId = Number(req.params.id);
     if (!Number.isInteger(structureId) || structureId <= 0) {
-      this.error(res, "Invalid structure id", 400);
+      this.error(res, new Error(`Structure with ${structureId} was not found`), 400);
       return;
     }
 
     try {
       const tree = await this.nodeService.getTree(structureId, publicOnly);
       if (tree === null) {
-        this.error(res, "Structure not found", 404);
+        this.error(res, new Error("This structure did not return a tree",), 404);
         return;
       }
-      res.status(200).json(tree);
+      this.success(res, tree)
     } catch (e: any) {
-      this.error(res, e.message, 500);
+      this.error(res, e);
     }
   };
 }

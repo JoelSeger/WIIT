@@ -20,6 +20,7 @@ import type { Knex } from 'knex';
 import { EadImportService, EadImportValidationError } from '../services/EADImportService';
 import { EadImportConflictError, type StructureType } from './eadImport';
 import type { AuthUser } from './exportRoute';
+import logger from '../config/logger';
 
 type MaybeAuthedRequest = Request & { user?: AuthUser };
 
@@ -69,8 +70,13 @@ export function createEadImportRouter({ knex, requireRole }: EadImportDeps): Rou
     try {
       res.json(service.preview(xml, structureTypeOf(req)));
     } catch (err) {
-      if (err instanceof EadImportValidationError) res.status(400).json({ error: err.message, issues: err.issues });
-      else throw err;
+      if (err instanceof EadImportValidationError) {
+        logger.error(err);
+        res.status(400).json({ error: err.message, issues: err.issues });
+      } else {
+        logger.error(err);
+        throw err;
+      }
     }
   });
 
@@ -98,6 +104,8 @@ export function createEadImportRouter({ knex, requireRole }: EadImportDeps): Rou
           direction: 'import', format: 'ead3', file_name: fileName, status: 'failed',
           message: message.slice(0, 4000), finished_at: knex.fn.now(), created_by: userId,
         }).catch(() => {});
+
+        logger.error(err);
 
         if (err instanceof EadImportValidationError) {
           res.status(400).json({ error: err.message, issues: err.issues });
