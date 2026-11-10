@@ -14,11 +14,24 @@ export class ExportArchive {
   exportType: 'all' | 'archive' | 'item' = 'all';
 
   selectedArchive: string = '';
+  structures: any[] = [];
+
   selectedItem: string = '';
   notificationMessage: string = '';
   notificationType: 'success' | 'error' = 'success';
   showNotification: boolean = false;
   private http = inject(HttpClient);
+
+  ngOnInit(): void {
+  this.http.get<any>('/api/structures').subscribe({
+    next: (response) => {
+      this.structures = response.data;
+    },
+    error: () => {
+      this.showPopup('Kunde inte hämta arkivförteckningarna.', 'error');
+    }
+  });
+}
 
   showPopup(message: string, type: 'success' | 'error'): void {
   this.notificationMessage = message;
@@ -32,14 +45,24 @@ exportArchive(): void {
     return;
   }
 
-  const id = this.selectedArchive.trim();
+  const name = this.selectedArchive.trim();
 
-  if (!id) {
-  this.showPopup('Ange ett struktur-ID.', 'error');
+if (!name) {
+  this.showPopup('Ange arkivförteckningens namn.', 'error');
   return;
-  }
+}
 
-  this.http.get(`/api/structures/${encodeURIComponent(id)}/export/ead3`, {
+const archive = this.structures.find(
+  structure => structure.name.toLowerCase() === name.toLowerCase()
+);
+
+if (!archive) {
+  this.showPopup('Arkivförteckningen hittades inte!', 'error');
+  return;
+}
+const id = archive.id;
+
+  this.http.get(`/api/structures/${encodeURIComponent(id)}/export/ead3?full=true`, {
   responseType: 'blob',
   observe: 'response'
   }).subscribe({
