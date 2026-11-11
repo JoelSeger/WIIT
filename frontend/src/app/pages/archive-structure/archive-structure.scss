@@ -46,7 +46,13 @@ $shadow-md: 0 4px 15px rgba(0, 0, 0, 0.1);
     
     flex-wrap: wrap; 
 
-    button {
+    button,
+    a {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        text-decoration: none;
         flex: 1;
         min-width: 250px;
         max-width: 320px;
@@ -68,4 +74,8 @@ $shadow-md: 0 4px 15px rgba(0, 0, 0, 0.1);
             background-color: #fafafa;
         }
     }
+}
+
+.archive-message {
+    color: #595959;
 }

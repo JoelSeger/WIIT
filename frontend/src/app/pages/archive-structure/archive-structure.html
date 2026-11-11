@@ -6,17 +6,17 @@
 
     <div class="archive-content">
 
-        <div class="archive-cards">
-            <button type="button">
-                Malmö Högskola 1998-2015
-            </button>
+        <!-- Arkivbildare from the backend (GET /api/archive-creators) -->
+        @if (message(); as text) {
+            <p class="archive-message" aria-live="polite">{{ text }}</p>
+        } @else {
+            <div class="archive-cards">
+                @for (card of cards(); track card.creator.id) {
+                    <a [routerLink]="card.link">{{ card.creator.name }}</a>
+                }
+            </div>
+        }
 
-            <button type="button">
-                Malmö Universitet
-            </button>
-
-        </div>
-        
     </div>
 
 </div>

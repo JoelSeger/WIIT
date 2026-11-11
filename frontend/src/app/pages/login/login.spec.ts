@@ -38,11 +38,12 @@ describe('LoginComponent', () => {
     expect(button.disabled).toBeTruthy();
   });
 
-  it('should show a placeholder message on submit', () => {
+  // Test login until SSO (F5.1) is in place: only test@mau.se / abc123 works
+  it('should show an error for a wrong email or password', () => {
+    component.email = 'fel@mau.se';
+    component.password = 'fel';
     component.onSubmit();
 
-    expect(component.loginError).toBe(
-      'Inloggning är inte tillgänglig ännu.'
-    );
+    expect(component.loginError).toBe('Felaktig e-postadress eller lösenord.');
   });
 });

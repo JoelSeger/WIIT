@@ -1,0 +1,231 @@
+<section class="node-view">
+  @if (!isValidAddress()) {
+    <p class="state-message" role="alert">Adressen är ogiltig.</p>
+  } @else {
+    <nav class="breadcrumb" aria-label="Sökväg">
+      <ol>
+        @for (creator of creatorPath(); track creator.id) {
+          <li>
+            <a [routerLink]="['/archive-creators', creator.id]">{{ creator.name }}</a>
+          </li>
+        }
+        @if (structure(); as s) {
+          <li>
+            <a [routerLink]="['/structures', s.id]">{{ s.name }}</a>
+          </li>
+        }
+        @for (ancestor of ancestors(); track ancestor.id) {
+          <li>
+            <a [routerLink]="['/structures', ancestor.structureId, 'nodes', ancestor.id]">{{
+              nodeLabel(ancestor)
+            }}</a>
+          </li>
+        }
+      </ol>
+    </nav>
+
+    @switch (tree().status) {
+      @case ('error') {
+        <p class="state-message" role="alert">{{ treeError() }}</p>
+      }
+      @case ('loaded') {
+        @if (node(); as n) {
+          <!-- One node -->
+          <header class="node-header">
+            <h1>{{ nodeLabel(n) }}</h1>
+            <p class="node-subtitle">
+              {{ n.nodeType.name }}
+              @if (!n.isPublished) {
+                <span class="tag">Ej publicerad</span>
+              }
+            </p>
+          </header>
+
+          <div class="tabs" role="tablist" aria-label="Information om noden">
+            @for (tab of tabs; track tab.id; let i = $index) {
+              <button
+                type="button"
+                role="tab"
+                class="tab"
+                [id]="'node-tab-' + tab.id"
+                [attr.aria-selected]="activeTab() === tab.id"
+                [attr.aria-controls]="'node-panel-' + tab.id"
+                [attr.tabindex]="activeTab() === tab.id ? 0 : -1"
+                [class.active]="activeTab() === tab.id"
+                (click)="selectTab(tab.id)"
+                (keydown)="onTabKeydown($event, i)"
+              >
+                {{ tab.label }}
+              </button>
+            }
+          </div>
+
+          <div
+            class="tab-panel"
+            role="tabpanel"
+            [id]="'node-panel-' + activeTab()"
+            [attr.aria-labelledby]="'node-tab-' + activeTab()"
+          >
+            @switch (activeTab()) {
+              @case ('general') {
+                <dl class="facts">
+                  <dt>Typ</dt>
+                  <dd>{{ n.nodeType.name }}</dd>
+                  @if (n.referenceCode) {
+                    <dt>Referenskod</dt>
+                    <dd>{{ n.referenceCode }}</dd>
+                  }
+                  @if (n.previousReferenceCode) {
+                    <dt>Tidigare referenskod</dt>
+                    <dd>{{ n.previousReferenceCode }}</dd>
+                  }
+                  @if (validity(); as v) {
+                    <dt>Giltighet</dt>
+                    <dd>{{ v }}</dd>
+                  }
+                  <dt>Struktur</dt>
+                  <dd>{{ structure()?.name }} ({{ structureTypeLabel() }})</dd>
+                </dl>
+
+                @if (n.description) {
+                  <p class="description">{{ n.description }}</p>
+                }
+
+                @if (n.portalUrl) {
+                  <p>
+                    <a
+                      class="portal-link"
+                      [href]="n.portalUrl"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Öppna i MAU Arkiv
+                      <span class="visually-hidden">(öppnas i ny flik)</span>
+                    </a>
+                  </p>
+                }
+              }
+              @case ('details') {
+                @if (fields().length > 0) {
+                  <dl class="facts">
+                    @for (field of fields(); track field.definitionId) {
+                      <dt [title]="field.helpText ?? ''">{{ field.label }}</dt>
+                      <dd>
+                        @for (value of field.values; track $index) {
+                          @if (field.dataType === 'url') {
+                            <a [href]="value" target="_blank" rel="noopener noreferrer">{{
+                              value
+                            }}</a>
+                          } @else {
+                            <span class="field-value">{{ value }}</span>
+                          }
+                        }
+                      </dd>
+                    }
+                  </dl>
+                } @else {
+                  <p class="muted">Inga fält är ifyllda för den här noden.</p>
+                }
+                @if (!isLoggedIn()) {
+                  <p class="muted">
+                    Vissa fält, till exempel sekretess och placering, visas bara för inloggade.
+                  </p>
+                }
+              }
+              @case ('history') {
+                <dl class="facts">
+                  <dt>Skapad</dt>
+                  <dd>
+                    {{ n.createdAt ? (n.createdAt | date: 'yyyy-MM-dd HH:mm') : 'Uppgift saknas' }}
+                  </dd>
+                  <dt>Senast ändrad</dt>
+                  <dd>
+                    {{ n.updatedAt ? (n.updatedAt | date: 'yyyy-MM-dd HH:mm') : 'Uppgift saknas' }}
+                  </dd>
+                  @if (n.sourceUpdatedAt) {
+                    <dt>Ändrad i källsystemet</dt>
+                    <dd>
+                      {{ n.sourceUpdatedAt | date: 'yyyy-MM-dd' }}
+                      @if (n.sourceUpdatedBy) {
+                        av {{ n.sourceUpdatedBy }}
+                      }
+                    </dd>
+                  }
+                  @if (n.externalId) {
+                    <dt>Id i källsystemet</dt>
+                    <dd>{{ n.externalId }}</dd>
+                  }
+                </dl>
+                <p class="muted">
+                  Ändringsloggen (F7) visas här när backend har en endpoint för den.
+                </p>
+              }
+            }
+          </div>
+        } @else if (nodeId() === null) {
+          <!-- A whole structure -->
+          <header class="node-header">
+            <h1>{{ structure()?.name ?? 'Struktur' }}</h1>
+            <p class="node-subtitle">
+              {{ structureTypeLabel() }}
+              @if (structureVersion(); as version) {
+                · {{ version }}
+              }
+              · {{ nodeCount() }} noder
+            </p>
+            <!-- NF6.1: export of this structure, chosen in advance on the export page -->
+            <a class="export-link" routerLink="/export-archive" [queryParams]="{ structure: structureId() }">
+              Exportera som EAD3
+            </a>
+          </header>
+        } @else {
+          <p class="state-message" role="alert">
+            Noden finns inte, eller så är den inte publicerad.
+          </p>
+        }
+
+        @for (group of childGroups(); track group.typeName) {
+          <section class="children" [attr.aria-label]="group.typeName">
+            <h2>
+              {{ group.typeName }} <span class="count">({{ group.nodes.length }})</span>
+            </h2>
+            <ul class="cards">
+              @for (child of group.nodes; track child.id) {
+                <li>
+                  <a
+                    class="card"
+                    [routerLink]="['/structures', child.structureId, 'nodes', child.id]"
+                  >
+                    <svg class="card-icon" viewBox="0 0 20 20" aria-hidden="true">
+                      <rect
+                        x="2.5"
+                        y="3.5"
+                        width="15"
+                        height="4"
+                        rx="0.8"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.3"
+                      />
+                      <path
+                        d="M3.5 7.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-8M8 10.5h4"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.3"
+                      />
+                    </svg>
+                    <span class="card-label">{{ nodeLabel(child) }}</span>
+                    <span class="card-arrow" aria-hidden="true">›</span>
+                  </a>
+                </li>
+              }
+            </ul>
+          </section>
+        }
+      }
+      @default {
+        <p class="state-message" aria-live="polite">Laddar …</p>
+      }
+    }
+  }
+</section>

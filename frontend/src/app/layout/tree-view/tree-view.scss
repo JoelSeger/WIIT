@@ -1,76 +1,112 @@
-.tree-container {
-  display: flex;
-  flex-direction: column;
-  font-family: Arial, sans-serif;
+// Same greys as the side menu (menu.scss) so the tree looks like part of it
+$text-color: #333333;
+$muted-text: #666666;
+$hover-background: #dcdcdc;
+$selected-background: #d0d0d0;
+$focus-outline: #1a1a1a;
+$tag-background: #fff3cd;
+$tag-text: #5c4400;
+
+:host {
+  display: block;
+}
+
+.tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   font-size: 14px;
-  color: #1a5090;
-  padding-top: 10px;
+  color: $text-color;
+}
+
+.tree-item {
+  cursor: pointer;
+  outline: none;
+
+  &:hover > .tree-row {
+    background-color: $hover-background;
+  }
+
+  &.selected > .tree-row {
+    background-color: $selected-background;
+    font-weight: 600;
+  }
+
+  // WCAG 2.4.7: keyboard focus must be visible
+  &:focus-visible > .tree-row {
+    outline: 2px solid $focus-outline;
+    outline-offset: -2px;
+  }
+
+  &.top-level > .tree-row {
+    font-size: 15px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
 }
 
 .tree-row {
   display: flex;
   align-items: center;
-  padding-top: 4px;
-  padding-bottom: 4px;
+  gap: 4px;
+  min-height: 30px;
   padding-right: 10px;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-
-  // Grå bakgrund när man hovrar över en rad
-  &:hover {
-    background-color: rgba(0, 0, 0, 0.05);
-  }
-
-  // Vald nod
-  &.selected {
-    background-color: rgba(26, 80, 144, 0.12);
-    font-weight: 600;
-  }
+  box-sizing: border-box;
 }
 
-// Ytan för pilen
-.toggle-container {
-  width: 20px;
-  height: 20px;
-  display: flex;
+.tree-toggle {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-right: 4px;
-  
-  .chevron {
-    font-size: 10px;
-    color: #1a5090;
-    transition: transform 0.2s ease;
-    display: inline-block;
-    
-    // När klassen "expanded" läggs på (av Angular), snurra pilen 90 grader
-    &.expanded {
-      transform: rotate(90deg); 
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: $muted-text;
+
+  svg {
+    width: 12px;
+    height: 12px;
+    transition: transform 0.15s ease;
+
+    &.open {
+      transform: rotate(90deg);
     }
   }
 }
 
-// Ikonerna
-.node-icon {
-  width: 16px;      
-  height: 16px;
-  margin-right: 8px;
-  object-fit: contain;
-  display: block;
-}
+.tree-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: $muted-text;
 
-// Texten
-.node-label {
-  white-space: nowrap;
-  
-  &:hover {
-    text-decoration: underline;
+  svg {
+    width: 18px;
+    height: 18px;
   }
 }
 
-.loading {
-  padding: 10px;
-  color: #666;
+.tree-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.tree-tag {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 400;
+  background-color: $tag-background;
+  color: $tag-text;
+}
+
+.tree-message {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  font-size: 13px;
   font-style: italic;
+  color: $muted-text;
 }

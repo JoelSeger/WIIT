@@ -9,7 +9,9 @@
             <input 
                 placeholder="Sök i arkivet..." 
                 type="text"
+                aria-label="Sök i arkivet"
                 (input)="onSearch($event)"
+                (keydown.enter)="submitSearch()"
             >
                
     @if (searchResults.length > 0) {
@@ -34,15 +36,15 @@
   </div>
 
         <div class="archive-cards">
-            <button type="button">
+            <button type="button" routerLink="/archive-structure">
                 Allmäna Arkivsystemet
             </button>
 
-            <button type="button">
+            <button type="button" routerLink="/archive-structure">
                 Klassificeringsstruktur
             </button>
 
-            <button type="button">
+            <button type="button" routerLink="/storage-unit">
                 Förvaringsenheter
             </button>
 

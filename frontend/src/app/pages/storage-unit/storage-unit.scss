@@ -40,6 +40,8 @@ $selected-background: #c5c5c5;
     gap: 1rem;
     max-width: 900px;
     margin: 0 auto;
+    padding: 0;
+    list-style: none;
 
     // Stacks storage units vertically when the container becomes narrow
     @container (max-width: 620px) {
@@ -60,6 +62,9 @@ $selected-background: #c5c5c5;
     background-color: $item-background;
     border: 1px solid $item-border;
     color: $text-color;
+    text-decoration: none;
+    box-sizing: border-box;
+    height: 100%;
     cursor: pointer;
 
     img {
@@ -85,4 +90,7 @@ $selected-background: #c5c5c5;
 }
 }
 
-
+.storage-message {
+  text-align: center;
+  color: #595959;
+}

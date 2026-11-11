@@ -1,6 +1,7 @@
 import { Component, inject, DestroyRef, ChangeDetectorRef } from '@angular/core';
-import { SearchService } from '../../services/search.service';
-import { SearchResult } from '../../models/search';
+import { Router, RouterLink } from '@angular/router';
+import { MIN_SEARCH_LENGTH, SearchService } from '../../core/services/search.service';
+import type { SearchResult } from '../../models/search.model';
 import { Subject, debounceTime, distinctUntilChanged, switchMap, of, catchError } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
@@ -8,7 +9,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 @Component({
   selector: 'app-public-archival-system',
   standalone: true,
-  imports: [],
+  imports: [RouterLink],
   templateUrl: './public-archival-system.html',
   styleUrl: './public-archival-system.scss'
 })
@@ -22,6 +23,10 @@ export class PublicArchivalSystem {
   private searchService = inject(SearchService);
   private destroyRef = inject(DestroyRef);
   private cdr = inject(ChangeDetectorRef);
+  private router = inject(Router);
+
+  /** Suggestions shown under the field; Enter opens the result page with all hits. */
+  private static readonly SUGGESTION_LIMIT = 10;
 
   // Handles search requests with debounce
   ngOnInit(): void {
@@ -33,7 +38,7 @@ export class PublicArchivalSystem {
           return of(null);
         }
         // catchError keeps the search working after a failed request
-        return this.searchService.search(query).pipe(
+        return this.searchService.search(query, PublicArchivalSystem.SUGGESTION_LIMIT).pipe(
           catchError(error => {
             console.error('Search failed:', error);
             return of(null);
@@ -62,8 +67,15 @@ export class PublicArchivalSystem {
     this.searchSubject.next(this.searchText.trim());
   }
 
-  // Handles clicks on search results (navigation will be added later)
+  // F4.2: a hit opens its node page, which also opens the path in the tree view
   selectSearchResult(result: SearchResult): void {
-    console.log('Selected search result:' , result);
+    void this.router.navigate(['/structures', result.structureId, 'nodes', result.nodeId]);
+  }
+
+  // F4.1: Enter opens the result page with all hits (/search?q=…)
+  submitSearch(): void {
+    const query = this.searchText.trim();
+    if (query.length < MIN_SEARCH_LENGTH) return;
+    void this.router.navigate(['/search'], { queryParams: { q: query, page: 1 } });
   }
 }

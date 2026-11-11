@@ -1,57 +1,45 @@
-
 <main class="export-page">
   <div class="export-content">
     <h1>Exportera arkivinformation</h1>
     <p>Exportera arkivbeskrivningar i EAD3/XML-format.</p>
 
-    <div class="export-options">
+    <fieldset class="export-options">
+      <legend class="visually-hidden">Vad ska exporteras?</legend>
       <label>
-        <input
-          type="radio"
-          name="exportType"
-          value="all"
-          [(ngModel)]="exportType"
-        >
-        Hela arkivet
+        <input type="radio" name="exportType" value="archive"
+          [checked]="exportType() === 'archive'" (change)="onTypeChange('archive')">
+        En struktur (klassificeringsstruktur, arkivförteckning eller förvaring)
       </label>
 
-      <label>
-        <input
-          type="radio"
-          name="exportType"
-          value="archive"
-          [(ngModel)]="exportType"
-        >
-        En arkivförteckning
+      <!-- The backend only exports one structure at a time so far -->
+      <label class="disabled">
+        <input type="radio" name="exportType" value="all" disabled>
+        Hela arkivet <small>(kommer senare)</small>
       </label>
 
-      <label>
-        <input
-          type="radio"
-          name="exportType"
-          value="item"
-          [(ngModel)]="exportType"
-        >
-        En arkivpost
+      <label class="disabled">
+        <input type="radio" name="exportType" value="item" disabled>
+        En arkivpost <small>(kommer senare)</small>
       </label>
-    </div>
+    </fieldset>
 
     <div class="export-fields">
-      <label for="archive">Välj arkivförteckning</label>
-      <input
-        id="archive"
-        type="text"
-        placeholder="Ange ett struktur-ID"
-        [(ngModel)]="selectedArchive"
-      >
+      <label for="structure">Välj struktur</label>
+      <select id="structure" (change)="onStructureChange($event)" [disabled]="structureOptions().length === 0">
+        @for (option of structureOptions(); track option.id) {
+          <option [value]="option.id" [selected]="option.id === selectedStructureId()">{{ option.label }}</option>
+        } @empty {
+          <option value="">Laddar strukturer …</option>
+        }
+      </select>
+      @if (structuresMessage(); as message) {
+        <p class="field-message" role="alert">{{ message }}</p>
+      }
 
-      <label for="archive-item">Välj arkivpost</label>
-      <input
-        id="archive-item"
-        type="text"
-        placeholder="Exempeldata...."
-        [(ngModel)]="selectedItem"
-      >
+      <label class="checkbox">
+        <input type="checkbox" [checked]="includeUnpublished()" (change)="onFullChange($event)">
+        Fullständig export: även opublicerade noder och interna fält (kräver redigerare)
+      </label>
     </div>
 
     <div class="export-format">
@@ -61,18 +49,13 @@
       <small>Formatet är förvalt och kan inte ändras.</small>
     </div>
 
-    <button 
-    class="export-button" 
-    type="button" 
-    (click)="exportArchive()">
-      Granska export / Exportera
+    <button class="export-button" type="button" [disabled]="!canExport()" (click)="exportArchive()">
+      {{ isExporting() ? 'Exporterar …' : 'Exportera' }}
     </button>
-    @if (showNotification) {
-  <app-notification-popup
-    [type]="notificationType"
-    [message]="notificationMessage"
-    (closed)="showNotification = false">
-  </app-notification-popup>
-}
+
+    @if (notification(); as n) {
+      <app-notification-popup [type]="n.type" [message]="n.message" (closed)="closeNotification()">
+      </app-notification-popup>
+    }
   </div>
 </main>

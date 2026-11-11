@@ -1,19 +1,18 @@
-export interface SearchInput {
-  q: string;
-  limit: number;
-  offset: number;
-  structureId?: number;
-  structureType?: string;
-}
+/**
+ * Data sent by GET /api/search (backend: controllers/searchController.ts).
+ * Copy of the contract in backend/src/models/search/search.ts.
+ */
 
+/** One ancestor of a hit, root first. */
 export interface SearchPathItem {
   id: number;
   title: string;
   referenceCode: string | null;
 }
 
+/** Why a node was found. */
 export interface SearchMatch {
-  field: "title" | "referenceCode" | "description" | "property";
+  field: 'title' | 'referenceCode' | 'description' | 'property';
   label: string;
   snippet: string;
 }

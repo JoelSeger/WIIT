@@ -10,6 +10,7 @@ import { createEadImportRouter } from './ead/importRoute';
 import { createNodeRouter } from './routers/nodeRoutes';
 import { createSearchRouter } from './routers/searchRoutes';
 import { createStructureRouter } from './routers/structureRoutes';
+import { createArchiveCreatorRouter } from './routers/archiveCreatorRoutes';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -30,6 +31,7 @@ app.use('/api/search', createSearchRouter(db));
 app.use('/api', createEadExportRouter({ knex: dbRaw, requireRole }));
 app.use('/api', createEadImportRouter({ knex: dbRaw, requireRole }));
 app.use('/api/structures', createStructureRouter(db));
+app.use('/api/archive-creators', createArchiveCreatorRouter(db));
 
 app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
