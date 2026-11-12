@@ -3,15 +3,15 @@ export interface ArchiveCreator {
   parentId?: number | null;
   creatorType: string;
   name: string;
-  startYear?: number;
-  endYear?: number;
-  description?: string;
-  externalId?: string;
+  startYear?: number | null;
+  endYear?: number |null;
+  description?: string | null;
+  externalId?: string |null;
   isPublished: boolean | null;
   createdAt?: Date;
-  createdBy?: number;
+  createdBy?: number | null;
   updatedAt?: Date;
-  updatedBy?: number;
+  updatedBy?: number | null;
 }
 
 /** An archive in the short form, e.g. for choosing where an import goes (archiveId). */

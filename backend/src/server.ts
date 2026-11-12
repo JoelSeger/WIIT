@@ -36,16 +36,8 @@ app.use('/api/search', createSearchRouter(db));
 app.use('/api', createEadExportRouter({ knex: dbRaw, requireRole }));
 app.use('/api', createEadImportRouter({ knex: dbRaw, requireRole }));
 app.use('/api/structures', createStructureRouter(db));
-app.use('/api/archive-creators', createArchiveCreatorRouter(db));
 app.use("/api/structures", createStructureCreationRoutes(db));
-app.use('/api/nodes', createNodeCreationRouter(db));         // POST create, PATCH edit, DELETE
-// F2 relations, F3.5 move, F5.3.5 publish, F7 change log
-const admin = createNodeAdminRouters(db);
-app.use('/api/nodes', admin.nodes);
-app.use('/api/structures', admin.structures);
-app.use('/api/relations', admin.relations);
-app.use('/api/relation-types', admin.relationTypes);
-app.use('/api/change-log', admin.changeLog);
+app.use('/api/nodes', createNodeCreationRouter(db));         // POST create
 // // Routes call next(err) (multer, import errors), so something has to answer
 app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
