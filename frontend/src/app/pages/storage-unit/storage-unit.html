@@ -1,21 +1,24 @@
 <section class="storage-unit">
-
   <h1>FÖRVARINGSENHETER</h1>
 
-  <!--Displays all storage units-->
-  <div class="storage-list">
-    @for (unit of storageUnits; track unit) {
-      <button
-        class="storage-item"
-        type="button"
-        [class.selected]="selectedUnit === unit"
-        [attr.aria-pressed]="selectedUnit === unit"
-        (click)="selectUnit(unit)"
-      >
-        <img src="/Archive.png" alt="" />
-        <span>{{ unit }}</span>
-      </button>
-    }
-  </div>
-
+  <!--Displays the top storage units from the backend; a click opens the unit (Figma figure 5.2)-->
+  @if (storageUnits().length > 0) {
+    <ul class="storage-list">
+      @for (unit of storageUnits(); track unit.id) {
+        <li>
+          <a
+            class="storage-item"
+            [routerLink]="['/structures', unit.structureId, 'nodes', unit.id]"
+          >
+            <img src="/Archive.png" alt="" />
+            <span>{{ nodeLabel(unit) }}</span>
+          </a>
+        </li>
+      }
+    </ul>
+  } @else if (isLoading()) {
+    <p class="storage-message" aria-live="polite">Laddar …</p>
+  } @else {
+    <p class="storage-message">Det finns inga förvaringsenheter att visa.</p>
+  }
 </section>

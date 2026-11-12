@@ -1,0 +1,62 @@
+<section class="search-results">
+  <h1>Sökresultat</h1>
+
+  @if (isTooShort()) {
+    <p class="info">Skriv minst två tecken i sökrutan och tryck på Enter.</p>
+  } @else if (isLoading()) {
+    <p class="info" aria-live="polite">Söker efter "{{ query() }}" …</p>
+  } @else if (hasError()) {
+    <p class="info error" role="alert">Sökningen misslyckades. Kontrollera att backend är igång och försök igen.</p>
+  } @else if (response(); as r) {
+    @if (r.total === 0) {
+      <p class="info">Inga träffar för "{{ query() }}".</p>
+    } @else {
+      <p class="summary" aria-live="polite">
+        Visar {{ firstHit() }}–{{ lastHit() }} av {{ r.total }} träffar för "{{ query() }}"
+      </p>
+
+      @if (r.truncated) {
+        <p class="info warning">
+          Sökningen gav väldigt många träffar och alla visas inte. Skriv ett mer exakt sökord.
+        </p>
+      }
+
+      <ol class="result-list" [attr.start]="firstHit()">
+        @for (result of r.results; track result.nodeId) {
+          <li class="result">
+            <a class="result-title" [routerLink]="resultLink(result)">
+              @if (result.referenceCode) {
+                <span class="reference-code">{{ result.referenceCode }}</span>
+              }
+              {{ result.title }}
+            </a>
+
+            <div class="result-meta">
+              <span class="node-type">{{ result.nodeType.name }}</span>
+            </div>
+
+            <div class="result-path">{{ pathText(result) }}</div>
+
+            @for (match of extraMatches(result); track $index) {
+              <div class="result-match">
+                <strong>{{ match.label }}:</strong> {{ match.snippet }}
+              </div>
+            }
+          </li>
+        }
+      </ol>
+
+      @if (totalPages() > 1) {
+        <nav class="pagination" aria-label="Sidor med sökresultat">
+          <button type="button" (click)="goToPage(page() - 1)" [disabled]="page() === 1">
+            Föregående
+          </button>
+          <span>Sida {{ page() }} av {{ totalPages() }}</span>
+          <button type="button" (click)="goToPage(page() + 1)" [disabled]="page() === totalPages()">
+            Nästa
+          </button>
+        </nav>
+      }
+    }
+  }
+</section>

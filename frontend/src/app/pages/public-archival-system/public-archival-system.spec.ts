@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { PublicArchivalSystem } from './public-archival-system';
 
 describe('PublicArchivalSystem', () => {
@@ -8,6 +9,7 @@ describe('PublicArchivalSystem', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [PublicArchivalSystem],
+      providers: [provideRouter([])],
     }).compileComponents();
 
     fixture = TestBed.createComponent(PublicArchivalSystem);

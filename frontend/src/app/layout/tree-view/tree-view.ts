@@ -1,126 +1,235 @@
-import { Component, inject, input, signal, computed, output, effect, OnDestroy } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Subscription } from 'rxjs';
+import {
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
+import { Router } from '@angular/router';
+import { StructureService } from '../../core/services/structure.service';
+import { TREE_GROUPS, TreeStateService } from '../../core/services/tree-state.service';
+import { type TreeRow, buildTreeRows } from './tree-rows';
 
-// Same shape as the backend TreeNode (backend/src/models/node/treeNode.ts)
-export interface NodeValue {
-  id: number;
-  nodeId: number;
-  propertyDefinitionId: number;
-  value: string;
-  valueOrder: number;
-  definition?: { id: number; name: string; isPublic: boolean; sortOrder: number };
-}
-export interface NodeType { id: number; name: string; code?: string }
-export interface TreeNode {
-  id: number;
-  parentId: number | null;
-  nodeTypeId: number;
-  title: string;
-  referenceCode: string | null;
-  isPublished: boolean | number;
-  nodeType: NodeType;
-  values: NodeValue[];
-  children: TreeNode[];
-}
-export interface FlatTreeNode extends TreeNode {
-  level: number;
-  hasChildren: boolean;
-  isExpanded: boolean;
-}
+const INDENT_PER_LEVEL_PX = 16;
+const BASE_INDENT_PX = 8;
+const STRUCTURE_KEY_PREFIX = 's:';
 
-/** F4.3 Tree-view, F4.3.1 Expand/Collapse */
+/**
+ * F4.3 / F4.3.1: tree view of all structures, shown in the side menu.
+ * Struktur and Förvaring are the top folders (Figma prototype, figures 4.1, 4.2 and 5.2);
+ * under Struktur come the arkivbildare and their structures.
+ * A structure's nodes are fetched the first time it is opened.
+ *
+ * Keyboard (code guidelines 5.8): arrow up/down move, right opens / goes to the first child,
+ * left closes / goes to the parent, Home/End jump, Enter opens the row and shows it,
+ * Space only shows it.
+ */
 @Component({
   imports: [],
   selector: 'app-tree-view',
   styleUrl: './tree-view.scss',
   templateUrl: './tree-view.html',
 })
-export class TreeView implements OnDestroy {
-  private http = inject(HttpClient);
-  private request?: Subscription;
+export class TreeView {
+  private readonly structureService = inject(StructureService);
+  private readonly treeState = inject(TreeStateService);
+  private readonly router = inject(Router);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
-  structureId = input.required<number>();
-  nodeSelected = output<FlatTreeNode>();
+  /** Row that last had keyboard focus. */
+  private readonly focusedKey = signal<string | null>(null);
 
-  nodes = signal<TreeNode[]>([]);
-  expandedIds = signal<Set<number>>(new Set());
-  selectedId = signal<number | null>(null);
-  isLoading = signal<boolean>(true);
-  hasError = signal<boolean>(false);
+  readonly selectedKey = this.treeState.selectedKey;
 
-  flatNodes = computed(() => this.flatten(this.nodes(), this.expandedIds(), 0));
+  readonly rows = computed<TreeRow[]>(() =>
+    buildTreeRows({
+      groups: TREE_GROUPS,
+      structures: this.structureService.structures(),
+      creators: this.structureService.archiveCreators(),
+      treeState: (id) => this.structureService.treeState(id),
+      expanded: this.treeState.expanded(),
+    }),
+  );
+
+  /** Rows that can get focus (message rows such as "Laddar …" cannot). */
+  private readonly focusableRows = computed(() => this.rows().filter((r) => r.kind !== 'message'));
+
+  /** The one row with tabindex 0, so Tab enters the tree on a sensible row. */
+  readonly tabStopKey = computed(() => {
+    const keys = new Set(this.focusableRows().map((row) => row.key));
+    const focused = this.focusedKey();
+    const selected = this.selectedKey();
+    if (focused && keys.has(focused)) {
+      return focused;
+    }
+    if (selected && keys.has(selected)) {
+      return selected;
+    }
+    return this.focusableRows()[0]?.key ?? null;
+  });
 
   constructor() {
-    // Reload when another structure is chosen
     effect(() => {
-      const id = this.structureId();
-      if (id) this.fetchTree(id);
+      if (this.structureService.structures().status === 'idle') {
+        void this.structureService.loadStructures();
+      }
+      if (this.structureService.archiveCreators().status === 'idle') {
+        void this.structureService.loadArchiveCreators();
+      }
     });
+    effect(() => this.loadOpenStructures());
+    effect(() => this.scrollToSelected());
   }
 
-  ngOnDestroy() {
-    this.request?.unsubscribe();
+  /** Left padding for a row at the given level. */
+  indent(level: number): number {
+    return BASE_INDENT_PX + (level - 1) * INDENT_PER_LEVEL_PX;
   }
 
-  private fetchTree(id: number) {
-    this.request?.unsubscribe(); // ignore the answer for a structure that is no longer chosen
-    this.isLoading.set(true);
-    this.hasError.set(false);
-    this.selectedId.set(null);
-
-    // The backend returns the tree array directly (no { success, data } wrapper)
-    this.request = this.http.get<TreeNode[]>(`/api/node/public/structures/${id}/tree`).subscribe({
-      next: (tree) => {
-        this.nodes.set(tree);
-        this.expandedIds.set(new Set(tree.map((n) => n.id))); // roots open from start
-        this.isLoading.set(false);
-      },
-      error: (err) => {
-        console.error('Kunde inte hämta träd från backend:', err);
-        this.nodes.set([]);
-        this.hasError.set(true);
-        this.isLoading.set(false);
-      },
-    });
+  /** Tooltip with the type and the full label, since long labels are cut off. */
+  tooltip(row: TreeRow): string {
+    return row.typeLabel ? `${row.typeLabel}: ${row.label}` : row.label;
   }
 
-  toggle(id: number, event?: Event) {
-    event?.stopPropagation();
-    const next = new Set(this.expandedIds());
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    this.expandedIds.set(next);
+  /** Click on the row: show it and open it (a second click keeps it open). */
+  onRowClick(row: TreeRow): void {
+    this.focusedKey.set(row.key);
+    this.activate(row);
+    if (row.hasChildren && !row.isExpanded) {
+      this.treeState.expand(row.key);
+    }
   }
 
-  selectNode(node: FlatTreeNode) {
-    this.selectedId.set(node.id);
-    this.nodeSelected.emit(node);
-    if (node.hasChildren) this.toggle(node.id);
+  /** Click on the arrow: only open or close (F4.3.1). */
+  onToggleClick(event: MouseEvent, row: TreeRow): void {
+    event.stopPropagation();
+    this.focusedKey.set(row.key);
+    if (row.hasChildren) {
+      this.treeState.toggle(row.key);
+    }
   }
 
-  private flatten(nodes: TreeNode[], expanded: Set<number>, level: number): FlatTreeNode[] {
-    let result: FlatTreeNode[] = [];
-    for (const node of nodes) {
-      const hasChildren = !!node.children && node.children.length > 0;
-      const isExpanded = expanded.has(node.id);
-      result.push({ ...node, level, hasChildren, isExpanded });
-      if (hasChildren && isExpanded) {
-        result = result.concat(this.flatten(node.children, expanded, level + 1));
+  onFocus(row: TreeRow): void {
+    this.focusedKey.set(row.key);
+  }
+
+  onKeydown(event: KeyboardEvent): void {
+    const rows = this.focusableRows();
+    const index = rows.findIndex((row) => row.key === this.tabStopKey());
+    const row = rows[index];
+    if (!row) {
+      return;
+    }
+    const handled = this.handleKey(event.key, row, index);
+    if (handled) {
+      event.preventDefault();
+    }
+  }
+
+  private handleKey(key: string, row: TreeRow, index: number): boolean {
+    const rows = this.focusableRows();
+    switch (key) {
+      case 'ArrowDown':
+        return this.moveFocus(rows[index + 1]);
+      case 'ArrowUp':
+        return this.moveFocus(rows[index - 1]);
+      case 'Home':
+        return this.moveFocus(rows[0]);
+      case 'End':
+        return this.moveFocus(rows[rows.length - 1]);
+      case 'ArrowRight':
+        return this.openOrEnter(row, rows[index + 1]);
+      case 'ArrowLeft':
+        return this.closeOrLeave(row);
+      case 'Enter':
+        this.activate(row);
+        if (row.hasChildren) {
+          this.treeState.toggle(row.key);
+        }
+        return true;
+      case ' ':
+        this.activate(row);
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  private openOrEnter(row: TreeRow, next: TreeRow | undefined): boolean {
+    if (!row.hasChildren) {
+      return false;
+    }
+    if (!row.isExpanded) {
+      this.treeState.expand(row.key);
+      return true;
+    }
+    return next?.parentKey === row.key ? this.moveFocus(next) : true;
+  }
+
+  private closeOrLeave(row: TreeRow): boolean {
+    if (row.isExpanded) {
+      this.treeState.collapse(row.key);
+      return true;
+    }
+    const parent = this.focusableRows().find((r) => r.key === row.parentKey);
+    return this.moveFocus(parent);
+  }
+
+  private moveFocus(row: TreeRow | undefined): boolean {
+    if (!row) {
+      return false;
+    }
+    this.focusedKey.set(row.key);
+    const element = this.rowElement(row.key);
+    if (element) {
+      element.focus();
+    } else {
+      // The row was just opened and is not drawn yet
+      afterNextRender(() => this.rowElement(row.key)?.focus(), { injector: this.injector });
+    }
+    return true;
+  }
+
+  /** Shows the row in the content area. */
+  private activate(row: TreeRow): void {
+    this.treeState.select(row.key);
+    void this.router.navigate([...row.link]);
+  }
+
+  /** Fetches the tree of every open structure that has not been fetched yet. */
+  private loadOpenStructures(): void {
+    for (const key of this.treeState.expanded()) {
+      if (!key.startsWith(STRUCTURE_KEY_PREFIX)) {
+        continue;
+      }
+      const structureId = Number(key.slice(STRUCTURE_KEY_PREFIX.length));
+      if (this.structureService.treeState(structureId).status === 'idle') {
+        void this.structureService.loadTree(structureId);
       }
     }
-    return result;
   }
 
-  /** e.g. "3.2.1 Hantera kursplaner" or "HT1 Begäran om utlämnande av allmän handling" */
-  getLabel(node: FlatTreeNode): string {
-    const title = node.title || `Namnlös nod (${node.id})`;
-    return node.referenceCode ? `${node.referenceCode} ${title}` : title;
+  /** Keeps the selected row visible, for example after a search hit opened its path. */
+  private scrollToSelected(): void {
+    const key = this.selectedKey();
+    this.rows();
+    if (!key) {
+      return;
+    }
+    // afterNextRender may not be called from inside an effect's reactive context
+    untracked(() =>
+      afterNextRender(() => this.rowElement(key)?.scrollIntoView?.({ block: 'nearest' }), {
+        injector: this.injector,
+      }),
+    );
   }
 
-  getIcon(node: FlatTreeNode): string {
-    if (node.level === 0) return '/archive2.png';
-    if (node.level === 1) return '/warehouse.png';
-    return '/shelving-unit.png';
+  private rowElement(key: string): HTMLElement | null {
+    return this.host.nativeElement.querySelector<HTMLElement>(`[data-key="${key}"]`);
   }
 }

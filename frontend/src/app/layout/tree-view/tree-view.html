@@ -1,41 +1,103 @@
-<div class="tree-container" role="tree">
-
-    @if (isLoading()) {
-    <div class="loading">Laddar struktur...</div>
-    } @else if (hasError()) {
-    <div class="loading">Kunde inte ladda trädet.</div>
-    } @else if (flatNodes().length === 0) {
-    <div class="loading">Strukturen är tom.</div>
+<ul class="tree" role="tree" aria-label="Arkivets strukturer" (keydown)="onKeydown($event)">
+  @for (row of rows(); track row.key) {
+    @if (row.kind === 'message') {
+      <li class="tree-message" role="none" [style.padding-left.px]="indent(row.level) + 20">
+        {{ row.label }}
+      </li>
     } @else {
-
-    @for (node of flatNodes(); track node.id) {
-    <!-- Indrag: node.level * 24 pixlar -->
-    <div class="tree-row"
+      <li
+        class="tree-item"
         role="treeitem"
-        [attr.aria-level]="node.level + 1"
-        [attr.aria-expanded]="node.hasChildren ? node.isExpanded : null"
-        [class.selected]="node.id === selectedId()"
-        [style.padding-left.px]="node.level * 24">
-
-        <!-- 1. Expanderingspil -->
-        <div class="toggle-container" (click)="node.hasChildren ? toggle(node.id, $event) : null">
-            @if (node.hasChildren) {
-            <span class="chevron" [class.expanded]="node.isExpanded">▶</span>
+        [attr.data-key]="row.key"
+        [attr.aria-level]="row.level"
+        [attr.aria-posinset]="row.posInSet"
+        [attr.aria-setsize]="row.setSize"
+        [attr.aria-expanded]="row.hasChildren ? row.isExpanded : null"
+        [attr.aria-selected]="row.key === selectedKey()"
+        [attr.tabindex]="row.key === tabStopKey() ? 0 : -1"
+        [class.selected]="row.key === selectedKey()"
+        [class.top-level]="row.kind === 'group'"
+        [title]="tooltip(row)"
+        (click)="onRowClick(row)"
+        (focus)="onFocus(row)"
+      >
+        <span class="tree-row" [style.padding-left.px]="indent(row.level)">
+          <span class="tree-toggle" aria-hidden="true" (click)="onToggleClick($event, row)">
+            @if (row.hasChildren) {
+              <svg viewBox="0 0 16 16" [class.open]="row.isExpanded">
+                <path
+                  d="M6 3.5 10.5 8 6 12.5"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                />
+              </svg>
             }
-        </div>
+          </span>
 
-        <!-- 2. Ikon -->
-        <img [src]="getIcon(node)" class="node-icon" alt="" />
+          <span class="tree-icon" aria-hidden="true">
+            @switch (row.kind) {
+              @case ('group') {
+                <svg viewBox="0 0 20 20">
+                  <path
+                    d="M2.5 5.5a1 1 0 0 1 1-1h4l1.5 2h7.5a1 1 0 0 1 1 1v7.5a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                  />
+                </svg>
+              }
+              @case ('creator') {
+                <svg viewBox="0 0 20 20">
+                  <path
+                    d="M3 8h14M4.5 8v7M8 8v7M12 8v7M15.5 8v7M2.5 16.5h15M10 3l7 4.5H3z"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.2"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              }
+              @case ('structure') {
+                <svg viewBox="0 0 20 20">
+                  <rect
+                    x="2.5"
+                    y="3.5"
+                    width="15"
+                    height="4"
+                    rx="0.8"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                  />
+                  <path
+                    d="M3.5 7.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-8M8 10.5h4"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                  />
+                </svg>
+              }
+              @default {
+                <svg viewBox="0 0 20 20">
+                  <path
+                    d="M5 2.5h6.5l3.5 3.5v11a.5.5 0 0 1-.5.5h-9.5a.5.5 0 0 1-.5-.5v-14a.5.5 0 0 1 .5-.5zM11.5 2.5V6H15M7.5 10h5M7.5 13h5"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.2"
+                  />
+                </svg>
+              }
+            }
+          </span>
 
-        <!-- 3. Referenskod + titel -->
-        <span class="node-label" tabindex="0"
-            (click)="selectNode(node)"
-            (keydown.enter)="selectNode(node)">
-            {{ getLabel(node) }}
+          <span class="tree-label">{{ row.label }}</span>
+
+          @if (!row.isPublished) {
+            <span class="tree-tag">Ej publicerad</span>
+          }
         </span>
-
-    </div>
+      </li>
     }
-
-    }
-</div>
+  }
+</ul>

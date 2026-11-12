@@ -1,0 +1,74 @@
+<section class="creator-view">
+  @if (loadError(); as message) {
+    <p class="state-message" role="alert">{{ message }}</p>
+  } @else if (isLoading()) {
+    <p class="state-message" aria-live="polite">Laddar …</p>
+  } @else if (creator(); as c) {
+    @if (parents().length > 0) {
+      <nav class="breadcrumb" aria-label="Sökväg">
+        <ol>
+          @for (parent of parents(); track parent.id) {
+            <li>
+              <a [routerLink]="['/archive-creators', parent.id]">{{ parent.name }}</a>
+            </li>
+          }
+        </ol>
+      </nav>
+    }
+
+    <header class="creator-header">
+      <h1>{{ c.name }}</h1>
+      <p class="subtitle">
+        Arkivbildare
+        @if (years(); as y) {
+          · {{ y }}
+        }
+        @if (!c.isPublished) {
+          <span class="tag">Ej publicerad</span>
+        }
+      </p>
+    </header>
+
+    @if (subCreators().length > 0) {
+      <section class="cards-section" aria-label="Underliggande arkivbildare">
+        <h2>Underliggande arkivbildare</h2>
+        <ul class="cards">
+          @for (sub of subCreators(); track sub.id) {
+            <li>
+              <a class="card" [routerLink]="['/archive-creators', sub.id]">
+                <span class="card-label">{{ sub.name }}</span>
+                <span class="card-arrow" aria-hidden="true">›</span>
+              </a>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+
+    @for (group of structureGroups(); track group.typeLabel) {
+      <section class="cards-section" [attr.aria-label]="group.typeLabel">
+        <h2>{{ group.typeLabel }}</h2>
+        <ul class="cards">
+          @for (structure of group.structures; track structure.id) {
+            <li>
+              <a class="card" [routerLink]="['/structures', structure.id]">
+                <span class="card-label">{{ structureLabel(structure) }}</span>
+                <span class="card-arrow" aria-hidden="true">›</span>
+              </a>
+            </li>
+          }
+        </ul>
+      </section>
+    } @empty {
+      @if (subCreators().length === 0) {
+        <p class="state-message">
+          Det finns inga strukturer kopplade till den här arkivbildaren ännu.
+        </p>
+      }
+    }
+  } @else {
+    <p class="state-message" role="alert">
+      Arkivbildaren finns inte, eller så är den inte publicerad.
+    </p>
+  }
+</section>

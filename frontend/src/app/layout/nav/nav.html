@@ -5,16 +5,17 @@
       <img [src]="menuIconUrl" alt="" />
     </button>
 
-    <button class="nav-button" routerLink="/import-archive" aria-label="Lägg till">
-      <img [src]="addIconUrl" alt="Lägg till" />
+    <!-- Sandie (import-frontend): the buttons link to their pages -->
+    <button class="nav-button" type="button" routerLink="/import-archive" aria-label="Importera EAD-fil">
+      <img [src]="addIconUrl" alt="" />
     </button>
 
-    <button class="nav-button" routerLink="/"  aria-label="Startsida">
-      <img [src]="homeIconUrl" alt="Startsida" />
+    <button class="nav-button" type="button" routerLink="/" aria-label="Startsida">
+      <img [src]="homeIconUrl" alt="" />
     </button>
 
-    <button class="nav-button" routerLink="/export-archive" aria-label="Ladda ner">
-      <img [src]="downloadIconUrl" alt="Ladda ner" />
+    <button class="nav-button" type="button" routerLink="/export-archive" aria-label="Ladda ner">
+      <img [src]="downloadIconUrl" alt="" />
     </button>
   </div>
 
@@ -25,23 +26,33 @@
     aria-label="Sök i arkivet"
     [value]="searchText"
     (input)="onSearch($event)"
+    (keydown.enter)="submitSearch()"
     />
 
-    @if (searchSuggestions.length > 0) {
+    @if (searchSuggestions().length > 0) {
       <div class="search-suggestions">
-        @for (result of searchSuggestions; track result.nodeId) {
+        @for (item of searchSuggestions(); track item.nodeId) {
           <button
             type="button"
-            (click)="selectSuggestion(result)"
+            (click)="selectSuggestion(item)"
           >
-            <span>{{ result.referenceCode ? result.referenceCode + ' ' : '' }}{{ result.title }}</span>
-            <small class="result-structure">{{ result.structureName }}</small>
+            <span class="suggestion-title">
+              {{ item.referenceCode ? item.referenceCode + ' - ' : '' }}{{ item.title }}
+            </span>
+            <span class="suggestion-path">{{ suggestionPath(item) }}</span>
+          </button>
+        }
+        <!-- Enter does the same: the result page with all hits -->
+        @if (searchTotal() > searchSuggestions().length) {
+          <button type="button" class="show-all" (click)="submitSearch()">
+            Visa alla {{ searchTotal() }} träffar
           </button>
         }
         </div>
-        } @else if (searchCompleted && searchText.trim().length >= 3) {
-
-    <p class="no-results">Inga sökresultat hittades</p>
+      } @else if (searchMessage()) {
+        <div class="search-suggestions" role="status">
+          <p class="search-message">{{ searchMessage() }}</p>
+        </div>
       }
       </div>
     

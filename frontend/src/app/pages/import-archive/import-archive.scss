@@ -1,42 +1,80 @@
+// Sandie's styles (import-frontend), with the nesting fixed so :hover, .dragging and
+// .has-file apply to the drop zone, and with styles for the preview and errors.
+$text-color: #222222;
+$muted-text: #595959;
+$accent: #e40d0d;
+$accent-hover: #b90124;
+$ok-color: #2e7d32;
+$error-background: #ffe6e6;
+$error-text: #8b0000;
+$warning-background: #fff8e1;
+$warning-text: #5c4400;
+
 .import-container {
     max-width: 800px;
     margin: 0 auto;
     padding: 2rem;
+    color: $text-color;
 }
 
 .import-header {
     margin-bottom: 2rem;
     h1 { margin: 0 0 0.5rem 0; font-size: 1.8rem; font-weight: 500; }
-    p { margin: 0; color: #555; }
+    p { margin: 0; color: $muted-text; }
+}
+
+.subtext {
+    font-size: 0.9rem;
+    color: $muted-text;
 }
 
 .alert {
     padding: 1rem;
     border-radius: 4px;
     margin-bottom: 1rem;
-    &.alert-error { background: #ffe6e6; color: #b30000; border: 1px solid #ff9999; }
-    &.warning { background: #ffe6e6; color: #8a6d3b; border: 1px solid #faebcc; ul { margin: 0.5rem 0 0 0; padding-left: 1.5rem; } }
+
+    p { margin: 0; }
+    ul { margin: 0.5rem 0 0 0; padding-left: 1.5rem; }
+    code { font-size: 0.8rem; margin-left: 0.25rem; color: $muted-text; }
+
+    &.alert-error { background: $error-background; color: $error-text; border: 1px solid #ff9999; }
+    &.alert-warning { background: $warning-background; color: $warning-text; border: 1px solid #f3d58a; }
 }
 
 .drop-zone {
+    display: block;
+    width: 100%;
     border: 2px dashed #888;
     border-radius: 8px;
     padding: 4rem 1rem;
     text-align: center;
     cursor: pointer;
     background-color: #fafafa;
+    color: inherit;
+    font: inherit;
     transition: all 0.2s;
-}
 
-&:hover, &.dragging {
-    background-color: #f0f0f0;
-    border-color: #333;
-}
+    &:hover, &.dragging {
+        background-color: #f0f0f0;
+        border-color: #333;
+    }
 
-&.has-file {
-    border-style: solid;
-    border-color: #4CAF50;
-    background-color: #f1f8f1;
+    &:focus-visible {
+        outline: 2px solid $text-color;
+        outline-offset: 2px;
+    }
+
+    &.has-file {
+        border-style: solid;
+        border-color: $ok-color;
+        background-color: #f1f8f1;
+    }
+
+    &.has-error {
+        border-style: solid;
+        border-color: $error-text;
+        background-color: $error-background;
+    }
 }
 
 .drop-content {
@@ -49,21 +87,57 @@
         width: 48px;
         height: 48px;
         color: #333;
-        margin-bottom: 0.5rem; 
+        margin-bottom: 0.5rem;
     }
 
     .file-icon {
-        color: #4CAF50;
+        color: $ok-color;
+    }
+}
+
+.status {
+    margin: 1rem 0 0;
+    color: $muted-text;
+}
+
+.preview-panel {
+    margin-top: 1.5rem;
+    padding: 1.5rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: #fff;
+
+    h2 { margin: 0 0 0.25rem; font-size: 1.2rem; font-weight: 600; }
+
+    table {
+        width: 100%;
+        margin: 1rem 0;
+        border-collapse: collapse;
+
+        th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #eee; }
+        th { font-size: 0.85rem; color: $muted-text; font-weight: 600; }
     }
 
-    p {
-        margin: 0;
+    .warnings {
+        margin-bottom: 1rem;
+        color: $warning-text;
+        ul { max-height: 200px; overflow-y: auto; }
+    }
+}
+
+.archive-select {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+
+    span:first-child { font-weight: 600; }
+
+    select {
+        max-width: 420px;
+        padding: 0.5rem;
         font-size: 1rem;
-    }
-
-    .subtext {
-        font-size: 0.9rem;
-        color: #666;
+        border: 1px solid #888;
+        border-radius: 4px;
     }
 }
 
@@ -86,14 +160,14 @@
             background: #fff;
             border-color: #666;
             color: #333;
-            &:hover { background: f0f0f0; }
+            &:hover { background: #f0f0f0; }
         }
 
         &.btn-primary {
-            background: #E40D0D;
+            background: $accent;
             color: #fff;
-            &:hover { background: #b90124; }
-            &:disabled { background: #ccc; cursor: not-allowed; }
+            &:hover:not(:disabled) { background: $accent-hover; }
+            &:disabled { background: #ccc; color: #555; cursor: not-allowed; }
         }
     }
 }
@@ -107,12 +181,8 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 
     h2 {
-        color: #4CAF50;
+        color: $ok-color;
         margin-top: 0;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        .icon {font-size: 1.5rem; }
     }
 
     .stats-grid {
@@ -137,28 +207,18 @@
 
             .stat-label {
                 font-size: 0.9rem;
-                color: #666;
+                color: $muted-text;
                 text-transform: uppercase;
                 letter-spacing: 1px;
             }
         }
-
-        .structure-list {
-            h3 {
-                margin-bottom: 0.5rem;
-                font-size: 1rem;
-            }
-
-            ul {
-                margin: 0;
-                padding-left: 1.5rem;
-                color: #444;
-            }
-
-            li span {
-                color: #888;
-                font-size: 0.9rem;
-            }
-        }
     }
+
+    .structure-list {
+        h3 { margin-bottom: 0.5rem; font-size: 1rem; }
+        ul { margin: 0; padding-left: 1.5rem; color: #444; }
+        li span { color: $muted-text; font-size: 0.9rem; margin-left: 0.25rem; }
+    }
+
+    .alert-warning ul { max-height: 200px; overflow-y: auto; }
 }

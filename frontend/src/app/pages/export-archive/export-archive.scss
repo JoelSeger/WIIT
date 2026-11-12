@@ -112,3 +112,67 @@ $content-width: 700px;
 .export-button:hover {
   background-color: $button-hover-color;
 }
+
+// Added with the structure list (replaces the free-text id field)
+fieldset.export-options {
+  border: none;
+  padding: 0;
+  margin-left: 0;
+
+  label.disabled {
+    color: #6b6b6b;
+    cursor: not-allowed;
+  }
+}
+
+.export-fields {
+  select {
+    background-color: white;
+    border: none;
+    border-radius: 20px;
+    padding: 10px 15px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .checkbox {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 30px;
+    font-size: 13px;
+    cursor: pointer;
+
+    // The text inputs above are 100% wide; the checkbox should not be
+    input[type='checkbox'] {
+      width: auto;
+      margin: 0;
+      padding: 0;
+      accent-color: #343333;
+    }
+  }
+
+  .field-message {
+    margin: -12px 0 20px;
+    font-size: 13px;
+    color: #8b0000;
+  }
+}
+
+.export-button:disabled {
+  background-color: #c4c4c4;
+  color: #4d4d4d;
+  cursor: not-allowed;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

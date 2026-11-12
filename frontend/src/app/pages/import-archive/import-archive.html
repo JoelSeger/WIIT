@@ -1,53 +1,128 @@
 <div class="import-container">
     <header class="import-header">
         <h1>Importera arkiv</h1>
-        <p>Ladda upp en EAD-fil (XML) för att importera strukturer och noder till arkivet.</p>
+        <p>Ladda upp en EAD3-fil (till exempel KS_IHP.ead3 från Klara) för att importera strukturer och noder till arkivet.</p>
     </header>
 
-    @if (errorMessage()) {
-        <div class="error-message">{{ errorMessage() }}</div>
+    @if (errorMessage(); as message) {
+        <div class="alert alert-error" role="alert">
+            <p>{{ message }}</p>
+            @if (issues().length > 0) {
+                <ul>
+                    @for (issue of issues().slice(0, visibleIssues); track $index) {
+                        <li>{{ issue.message }} @if (issue.path) {<code>{{ issue.path }}</code>}</li>
+                    }
+                </ul>
+                @if (issues().length > visibleIssues) {
+                    <details>
+                        <summary>Visa alla {{ issues().length }} fel</summary>
+                        <ul>
+                            @for (issue of issues().slice(visibleIssues); track $index) {
+                                <li>{{ issue.message }} @if (issue.path) {<code>{{ issue.path }}</code>}</li>
+                            }
+                        </ul>
+                    </details>
+                }
+            }
+        </div>
     }
 
-    <form (ngSubmit)="onSubmit()">
-        <div
+    <form (submit)="onSubmit($event)">
+        <!-- A button, so the drop zone can also be used with the keyboard (code guidelines 5.8) -->
+        <button
+            type="button"
             class="drop-zone"
-            [class.dragging]="isDragging"
-            [class.has-file]="selectedFile"
+            [class.dragging]="isDragging()"
+            [class.has-file]="selectedFile() && !errorMessage()"
+            [class.has-error]="selectedFile() && errorMessage()"
             (dragover)="onDragOver($event)"
             (dragleave)="onDragLeave($event)"
             (drop)="onDrop($event)"
             (click)="fileInput.click()">
 
-          <input #fileInput type="file" (change)="onFileSelected($event)" hidden accept=".xml,.ead,.ead3" />
-
-            @if (!selectedFile) {
-                <div class="drop-content">
-                    <svg class="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            @if (!selectedFile()) {
+                <span class="drop-content">
+                    <svg class="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0L8 12m4-4v12"></path></svg>
-                        <p><strong>Dra din EAD-fil hit</strong></p>
-                  <p class="subtext">eller klicka för att välja fil från datorn (.xml, .ead, .ead3)</p>
-                    </div>
+                    <strong>Dra din EAD3-fil hit</strong>
+                    <span class="subtext">eller klicka för att välja fil från datorn ({{ acceptedExtensions }})</span>
+                </span>
             } @else {
-                <div class="drop-content file-selected">
-                    <svg class="file-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4a1 1 0 011-1h8a1 1 0 011 1v12m-4-4l-4-4m0 0L8 12m4-4v12"></path></svg>
-                    <p><strong>{{ selectedFile.name }}</strong></p>
-                    <p class="subtext">Klicka för att byta fil</p>
-                </div>
-                }
-        </div>
+                <span class="drop-content file-selected">
+                    <svg class="file-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    <strong>{{ selectedFile()?.name }}</strong>
+                    <span class="subtext">Klicka för att byta fil</span>
+                </span>
+            }
+        </button>
+        <input #fileInput type="file" (change)="onFileSelected($event)" hidden [accept]="acceptedExtensions" />
+
+        @if (isChecking()) {
+            <p class="status" aria-live="polite">Kontrollerar filen …</p>
+        }
+
+        @if (preview(); as p) {
+            @if (p.valid) {
+                <section class="preview-panel" aria-label="Förhandsgranskning">
+                    <h2>Förhandsgranskning</h2>
+                    <p class="subtext">
+                        Det här skapas om du importerar. Inget är sparat än.
+                        @if (p.metadata.agencyName) {
+                            Från {{ p.metadata.agencyName }}.
+                        }
+                    </p>
+                    <table>
+                        <thead>
+                            <tr><th scope="col">Struktur</th><th scope="col">Typ</th><th scope="col">Noder</th></tr>
+                        </thead>
+                        <tbody>
+                            @for (tree of p.trees; track $index) {
+                                <tr>
+                                    <td>{{ tree.name }}</td>
+                                    <td>{{ typeLabel(tree.structureType) }}</td>
+                                    <td>{{ tree.nodeCount }}</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+
+                    @if (p.warnings.length > 0) {
+                        <details class="warnings">
+                            <summary>{{ p.warnings.length }} varningar (importen fungerar ändå)</summary>
+                            <ul>
+                                @for (warning of p.warnings; track $index) {
+                                    <li>{{ warning.message }}</li>
+                                }
+                            </ul>
+                        </details>
+                    }
+
+                    <label class="archive-select">
+                        <span>Koppla till arkiv</span>
+                        <select (change)="onArchiveChange($event)">
+                            <option value="" [selected]="selectedArchiveId() === null">Ingen koppling</option>
+                            @for (option of archiveOptions(); track option.id) {
+                                <option [value]="option.id" [selected]="selectedArchiveId() === option.id">{{ option.label }}</option>
+                            }
+                        </select>
+                        <span class="subtext">Strukturen hamnar då under arkivbildaren i trädet.</span>
+                    </label>
+                </section>
+            }
+        }
 
         <div class="form-actions">
             <button type="button" class="btn btn-outline" routerLink="/">Avbryt</button>
-            <button type="submit" class="btn btn-primary" [disabled]="isUploading() || !selectedFile">
-                {{ isUploading() ? 'Importerar...' : 'Importera' }}
+            <button type="submit" class="btn btn-primary" [disabled]="!canImport()">
+                {{ isUploading() ? 'Importerar …' : 'Importera' }}
             </button>
         </div>
     </form>
 
     @if (importResult(); as result) {
-        <div class="result-panel">
-            <h2><span class="icon">Importen lyckades!</span></h2>
+        <div class="result-panel" role="status">
+            <h2>Importen lyckades!</h2>
 
             <div class="stats-grid">
                 <div class="stat-box">
@@ -65,20 +140,23 @@
                 <h3>Skapade strukturer:</h3>
                 <ul>
                     @for (structure of result.structures; track structure.id) {
-                      <li>{{ structure.name }} <span>(id {{ structure.id }}, {{ structure.nodeCount }} noder)</span></li>
+                        <li>
+                            <a [routerLink]="['/structures', structure.id]">{{ structure.name }}</a>
+                            <span>({{ typeLabel(structure.structureType) }}, {{ structure.nodeCount }} noder)</span>
+                        </li>
                     }
                 </ul>
             </div>
 
-            @if (result.warnings && result.warnings.length > 0) {
-                <div class="alert alert-warning">
-                    <h3>Varningar under importen:</h3>
+            @if (result.warnings.length > 0) {
+                <details class="alert alert-warning">
+                    <summary>{{ result.warnings.length }} varningar under importen</summary>
                     <ul>
                         @for (warning of result.warnings; track $index) {
                             <li>{{ warning }}</li>
                         }
                     </ul>
-                </div>
+                </details>
             }
         </div>
     }
