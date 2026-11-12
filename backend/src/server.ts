@@ -7,10 +7,14 @@ import { createUserRouter } from './routers/userRoutes';
 import { createIndexRouter } from './routers/indexRoutes';
 import { createEadExportRouter } from './ead/exportRoute';
 import { createEadImportRouter } from './ead/importRoute';
+import { createStructureCreationRoutes } from './routers/structureCreationRoute';
+import { createNodeCreationRouter } from './routers/nodeCreationRoute';
 import { createNodeRouter } from './routers/nodeRoutes';
 import { createSearchRouter } from './routers/searchRoutes';
 import { createStructureRouter } from './routers/structureRoutes';
 import { createArchiveCreatorRouter } from './routers/archiveCreatorRoutes';
+import { createAuthRouter, devLoginAllowed } from './routers/authRoutes';
+import { createNodeAdminRouters } from './routers/nodeAdminRoutes';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -25,6 +29,7 @@ app.use(session({
 app.use(attachUser);
 
 app.use('/', createIndexRouter());
+app.use('/api/auth', createAuthRouter(db));
 app.use('/api/users', createUserRouter(db));
 app.use('/api/node', createNodeRouter(db))
 app.use('/api/search', createSearchRouter(db));
@@ -32,10 +37,22 @@ app.use('/api', createEadExportRouter({ knex: dbRaw, requireRole }));
 app.use('/api', createEadImportRouter({ knex: dbRaw, requireRole }));
 app.use('/api/structures', createStructureRouter(db));
 app.use('/api/archive-creators', createArchiveCreatorRouter(db));
-
+app.use("/api/structures", createStructureCreationRoutes(db));
+app.use('/api/nodes', createNodeCreationRouter(db));         // POST create, PATCH edit, DELETE
+// F2 relations, F3.5 move, F5.3.5 publish, F7 change log
+const admin = createNodeAdminRouters(db);
+app.use('/api/nodes', admin.nodes);
+app.use('/api/structures', admin.structures);
+app.use('/api/relations', admin.relations);
+app.use('/api/relation-types', admin.relationTypes);
+app.use('/api/change-log', admin.changeLog);
+// // Routes call next(err) (multer, import errors), so something has to answer
 app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
   res.status(err.status ?? 500).json({ success: false, error: err.message });
 });
 
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+  if (devLoginAllowed()) console.warn('DEV_LOGIN is on: POST /api/auth/dev-login lets anyone log in. Never in production.');
+});
