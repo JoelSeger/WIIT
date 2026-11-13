@@ -7,6 +7,8 @@ import { createUserRouter } from './routers/userRoutes';
 import { createIndexRouter } from './routers/indexRoutes';
 import { createEadExportRouter } from './ead/exportRoute';
 import { createEadImportRouter } from './ead/importRoute';
+import { createStructureCreationRoutes } from './routers/structureCreationRoute';
+import { createNodeCreationRouter } from './routers/nodeCreationRoute';
 import { createNodeRouter } from './routers/nodeRoutes';
 import { createSearchRouter } from './routers/searchRoutes';
 import { createStructureRouter } from './routers/structureRoutes';
@@ -30,7 +32,9 @@ app.use('/api/search', createSearchRouter(db));
 app.use('/api', createEadExportRouter({ knex: dbRaw, requireRole }));
 app.use('/api', createEadImportRouter({ knex: dbRaw, requireRole }));
 app.use('/api/structures', createStructureRouter(db));
-
+app.use("/api/structures", createStructureCreationRoutes(db));
+app.use('/api/nodes', createNodeCreationRouter(db));         // POST create
+// // Routes call next(err) (multer, import errors), so something has to answer
 app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
   res.status(err.status ?? 500).json({ success: false, error: err.message });
