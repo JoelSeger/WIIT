@@ -13,7 +13,7 @@ import { createNodeRouter } from './routers/nodeRoutes';
 import { createSearchRouter } from './routers/searchRoutes';
 import { createAuthRouter, devLoginAllowed } from './routers/authRoutes';
 import { createStructureRouter } from './routers/structureRoutes';
-
+import logger from './config/logger';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -27,6 +27,15 @@ app.use(session({
 }));
 app.use(attachUser);
 
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    logger.info({ method: req.method, url: req.originalUrl, status: res.statusCode,
+      ms: Date.now() - start, userId: req.user?.id }, 'request');
+  });
+  next();
+});
+
 app.use('/', createIndexRouter());
 app.use('/api/auth', createAuthRouter(db));
 app.use('/api/users', createUserRouter(db));
@@ -37,13 +46,13 @@ app.use('/api', createEadImportRouter({ knex: dbRaw, requireRole }));
 app.use('/api/structures', createStructureRouter(db));
 app.use("/api/structures", createStructureCreationRoutes(db));
 app.use('/api/nodes', createNodeCreationRouter(db));         // POST create
-// // Routes call next(err) (multer, import errors), so something has to answer
-app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
-  console.error(err);
+// Routes call next(err) (multer, import errors), so something has to answer
+app.use((err: Error & { status?: number }, req: Request, res: Response, _next: NextFunction) => {
+  logger.error({ err, method: req.method, url: req.originalUrl, userId: req.user?.id }, 'Unhandled error');
   res.status(err.status ?? 500).json({ success: false, error: err.message });
 });
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  if (devLoginAllowed()) console.warn('DEV_LOGIN is on: POST /api/auth/dev-login lets anyone log in. Never in production.');
+  if (devLoginAllowed()) logger.warn('DEV_LOGIN is on: POST /api/auth/dev-login lets anyone log in. Never in production.');
 });

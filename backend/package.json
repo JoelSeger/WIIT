@@ -28,6 +28,8 @@
     "knex-stringcase": "^1.6.0",
     "mssql": "^12.7.9",
     "multer": "^2.4.0",
+    "pino": "^10.4.0",
+    "pino-pretty": "^13.2.0",
     "tedious": "^20.3.7"
   },
   "devDependencies": {

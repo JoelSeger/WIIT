@@ -1,4 +1,5 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
+import logger from '../config/logger';
 
 export function attachUser(req: Request, _res: Response, next: NextFunction): void {
   req.user = req.session.user;
@@ -7,6 +8,7 @@ export function attachUser(req: Request, _res: Response, next: NextFunction): vo
 
 export function authenticate(req: Request, res: Response, next: NextFunction): void {
   if (!req.user) {
+    logger.warn({ method: req.method, url: req.originalUrl }, 'Unauthorized');
     res.status(401).json({ success: false, error: 'Unauthorized' });
     return;
   }
@@ -32,8 +34,10 @@ export const requireRole = (...roles: string[]): RequestHandler =>
   (req, res, next) => {
     if (hasRole(req, ...roles)) { next(); return; }
     if (!req.user) {
+      logger.warn({ method: req.method, url: req.originalUrl }, 'Unauthorized');
       res.status(401).json({ success: false, error: 'Unauthorized' });
       return;
     }
+    logger.warn({ method: req.method, url: req.originalUrl, userId: req.user.id, roles: req.user.roles }, 'Forbidden');
     res.status(403).json({ success: false, error: 'Forbidden' });
   };
