@@ -1,5 +1,8 @@
+import { RA_EAD_NOTE_KEY } from "./ead.types";
 import type {
+  EadArchive,
   EadDidNote,
+  EadFormat,
   EadIssue,
   EadMetadata,
   EadNode,
@@ -77,7 +80,9 @@ function decodeXmlEntities(text: string): string {
 
 function textValue(value: unknown): string | null {
   const text = collectText(value);
-  return text ? decodeXmlEntities(text) || null : null;
+  // GV.ead / LS.ead have Windows line endings (CRLF, sometimes written as &#13;); the database
+  // and the frontend use \n only
+  return text ? decodeXmlEntities(text).replace(/\r\n?/g, "\n") || null : null;
 }
 
 // Block elements (<scopecontent>, <appraisal>, <odd> …) may start with a <head>.
@@ -91,8 +96,15 @@ function withoutHead(value: unknown): unknown {
   });
 }
 
+// Each <p> is a paragraph. They are joined with a blank line, because that is what the exports
+// (buildEad3.ts, buildRaEad.ts) split on when they write <p> elements again.
 function blockText(value: unknown): string | null {
-  return textValue(withoutHead(value));
+  const paragraphs = asArray(withoutHead(value)).flatMap((item) => {
+    const p = item && typeof item === "object" ? (item as XmlObject).p : undefined;
+    return p === undefined ? [textValue(item)] : asArray(p).map(textValue);
+  });
+
+  return paragraphs.filter(Boolean).join("\n\n") || null;
 }
 
 function scopeContentValue(value: unknown): string | null {
@@ -156,6 +168,27 @@ function componentEntries(source: unknown): ComponentEntry[] {
   return result;
 }
 
+/**
+ * Tells the two formats apart: RA-EAD (EAD 2002) has <eadheader>, EAD3 has <control>.
+ * Exported so the route can log the right format even when the import fails.
+ */
+export function detectEadFormat(ead: unknown): EadFormat {
+  return Object.prototype.hasOwnProperty.call(asObject(ead), "eadheader")
+    ? "ra-ead"
+    : "ead3";
+}
+
+/** <physdesc><extent unit="vol.">26</extent></physdesc> becomes "26 vol."; plain text is kept as it is. */
+function physdescValue(physdesc: unknown): string | null {
+  const extents = asArray(asObject(physdesc).extent)
+    .map((extent) =>
+      [textValue(extent), attribute(extent, "unit")].filter(Boolean).join(" ")
+    )
+    .filter(Boolean);
+
+  return extents.length > 0 ? extents.join(", ") : textValue(physdesc);
+}
+
 function mapDidNotes(did: unknown): EadDidNote[] {
   return asArray(asObject(did).didnote).map((item) => ({
     localtype: attribute(item, "localtype"),
@@ -164,13 +197,27 @@ function mapDidNotes(did: unknown): EadDidNote[] {
 }
 
 /**
- * Maps a parsed EAD3 document to EadNode objects that the import can store.
+ * Maps a parsed EAD document (EAD3 or RA-EAD) to EadNode objects that the import can store.
  * Problems are collected in the errors / warnings lists instead of thrown, so a preview
  * can show all of them at once.
+ *
+ * The two formats share <archdesc>, <did>, <c>, <unitid>, <unittitle>, <physloc> and <odd>, so
+ * mapNode reads both. What differs is read per format:
+ *
+ *                    EAD3                              RA-EAD (EAD 2002)
+ *   document info    <control>                         <eadheader>
+ *   dates            <unitdatestructured>              <unitdate>, free text ("1998 -- 2015")
+ *   extent           -                                 <physdesc><extent unit="vol.">
+ *   physloc type     @localtype                        @type
+ *   arkivbildare     -                                 <origination><corpname role="arkivbildare">
+ *   history          -                                 <custodhist>
  */
 export class EadMapper {
+  /** Format of the document being mapped; set by map() and read by mapNode(). */
+  private format: EadFormat = "ead3";
+
   /**
-   * Reads <control> into metadata and <archdesc> into a tree of nodes.
+   * Reads <control> / <eadheader> into metadata and <archdesc> into a tree of nodes.
    * Adds an error when the document title or the archive description is missing.
    */
   map(
@@ -179,14 +226,18 @@ export class EadMapper {
     warnings: EadIssue[] = []
   ): MappedEad {
     const ead = child(parsed, "ead");
-    const control = child(ead, "control");
+    this.format = detectEadFormat(ead);
+    const isRaEad = this.format === "ra-ead";
+    // RA-EAD keeps the document information in <eadheader>, with <eadid> instead of <recordid>
+    const control = child(ead, isRaEad ? "eadheader" : "control");
     const languageDeclaration = child(control, "languagedeclaration");
     const fileDescription = child(control, "filedesc");
     const titleStatement = child(fileDescription, "titlestmt");
     const archdesc = child(ead, "archdesc");
 
     const metadata: EadMetadata = {
-      recordId: firstText(control.recordid),
+      format: this.format,
+      recordId: firstText(isRaEad ? control.eadid : control.recordid),
       titleProper: firstText(titleStatement.titleproper),
       edition: firstText(child(fileDescription, "editionstmt").edition),
       agencyName: firstText(
@@ -205,12 +256,12 @@ export class EadMapper {
         )
       ),
       publicationStatus: attribute(control, "audience"),
-      eadVersion: attribute(ead, "version") || "EAD3",
+      eadVersion: attribute(ead, "version") || (isRaEad ? "RA-EAD" : "EAD3"),
     };
 
     if (!metadata.titleProper) {
       errors.push({
-        path: "/ead/control/filedesc/titlestmt/titleproper",
+        path: `/ead/${isRaEad ? "eadheader" : "control"}/filedesc/titlestmt/titleproper`,
         message: "The EAD document title is missing.",
       });
     }
@@ -234,6 +285,29 @@ export class EadMapper {
     return {
       metadata,
       rootNode,
+      archive: isRaEad && rootNode ? this.mapArchive(archdesc, rootNode) : null,
+    };
+  }
+
+  /**
+   * RA-EAD: <archdesc level="fonds"> is the arkiv, and <origination> names its arkivbildare.
+   * The history text is <custodhist>; LS.ead also has a note in <odd> at the same level, which
+   * is added after it so that nothing from the file is dropped.
+   */
+  private mapArchive(archdesc: XmlObject, rootNode: EadNode): EadArchive {
+    const origination = child(child(archdesc, "did"), "origination");
+    const creator = asArray(origination.corpname)
+      .concat(asArray(origination.persname), asArray(origination.famname))[0];
+
+    const description = [blockText(archdesc.custodhist), blockText(archdesc.odd)]
+      .filter(Boolean)
+      .join("\n\n");
+
+    return {
+      name: rootNode.name,
+      creatorName: textValue(creator),
+      creatorExternalId: attribute(creator, "authfilenumber"),
+      description: description || null,
     };
   }
 
@@ -263,6 +337,7 @@ export class EadMapper {
       )?.text ?? null;
 
     const originalName = firstText(did.unittitle, object.unittitle);
+    const isRaEad = this.format === "ra-ead";
 
     // Klara puts several <unitid> in one <did>:
     //   (no localtype)        the real identifier        -> unitid
@@ -322,7 +397,8 @@ export class EadMapper {
         message:
           "The archive description has no title; the EAD document title was used as a fallback.",
       });
-    } else if (!originalName && unitid) {
+    } else if (!originalName && unitid && !isRaEad) {
+      // In RA-EAD a volume never has a title (only its number), so it is not worth a warning
       warnings.push({
         path,
         message: "The node has no title; its unit identifier will be used.",
@@ -333,12 +409,51 @@ export class EadMapper {
     const validFrom = isoDateOnly(dateRange.fromdate);
     const validTo = isoDateOnly(dateRange.todate);
 
+    // RA-EAD: <unittitle label="…"> often repeats the title. When it differs it is kept, since
+    // it is the only place that text exists.
+    const titleLabel = attribute(asArray(did.unittitle)[0], "label");
+    if (isRaEad && titleLabel && originalName && titleLabel !== originalName) {
+      properties.push({
+        element: "unittitle_label",
+        localtype: null,
+        label: null,
+        value: titleLabel,
+      });
+    }
+
+    // Free-text dates. RA-EAD has only these ("1998", "1999-2000", "1998 -- 2015", "2009-"),
+    // so they are stored as text and not forced into valid_from / valid_to.
+    for (const unitdate of asArray(did.unitdate)) {
+      const value = textValue(unitdate);
+      if (value) {
+        properties.push({
+          element: "unitdate",
+          localtype: null,
+          label: attribute(unitdate, "label"),
+          value,
+        });
+      }
+    }
+
+    for (const physdesc of asArray(did.physdesc)) {
+      const value = physdescValue(physdesc);
+      if (value) {
+        properties.push({
+          element: "physdesc",
+          localtype: attribute(physdesc, "localtype"),
+          label: attribute(physdesc, "label"),
+          value,
+        });
+      }
+    }
+
     for (const physloc of asArray(did.physloc)) {
       const value = textValue(physloc);
       if (value) {
         properties.push({
           element: "physloc",
-          localtype: attribute(physloc, "localtype"),
+          // EAD 2002 calls the attribute @type, EAD3 @localtype
+          localtype: attribute(physloc, "localtype") ?? attribute(physloc, "type"),
           label: null,
           value,
         });
@@ -365,13 +480,27 @@ export class EadMapper {
 
     // WIIT's export writes every field without an EAD element of its own as
     // <odd localtype="key"><head>Label</head><p>value</p></odd>; the key maps it back to the field.
+    // RA-EAD: <custodhist> on <archdesc> is the arkiv's history (Arkivbeskrivning). The arkiv is
+    // a node of its own (Arkiv / Serie / Volym), so the text is a field on that node.
+    if (isRaEad) {
+      const history = blockText(object.custodhist);
+      if (history) {
+        properties.push({ element: "custodhist", localtype: null, label: null, value: history });
+      }
+    }
+
+    // RA-EAD: <odd> is the Anmärkning, on the arkiv as well as on series and volumes.
     for (const odd of asArray(object.odd)) {
       const value = blockText(odd);
       if (value) {
         properties.push({
           element: "odd",
-          localtype: attribute(odd, "localtype"),
-          label: textValue(asObject(odd).head),
+          // EAD 2002 calls the attribute @type; an <odd> without it is the Anmärkning
+          localtype:
+            attribute(odd, "localtype") ??
+            attribute(odd, "type") ??
+            (isRaEad ? RA_EAD_NOTE_KEY : null),
+          label: textValue(asObject(odd).head) ?? (isRaEad ? "Anmärkning" : null),
           value,
         });
       }

@@ -21,12 +21,33 @@
  *                                               ead_element or key, or a new field
  *     <unitid localtype="relations"><ref>       node_relations 'relaterad_till'
  *
+ * RA-EAD (Riksarkivet's EAD 2002 variant: the old arkivförteckningar GV.ead / LS.ead) goes
+ * through the same code. What is specific to it:
+ *
+ *   <archdesc level="fonds">                    node type Arkiv, the top node of one structure of
+ *                                               type 'arkivforteckning'. The structure is also
+ *                                               linked to a row in archives (found by name, or
+ *                                               created), which the EAD3 export uses
+ *   <origination><corpname role="arkivbildare"> archive_creators (found, or created)
+ *   <custodhist>                                field Historik on the Arkiv node (and archives.description)
+ *   fonds-level <odd>                           field Anmärkning on the Arkiv node
+ *   <c level="series">                          node type Serie, under the Arkiv node
+ *   <c level="otherlevel" otherlevel="volym">   node type Volym; title = its number, since the
+ *                                               file has no <unittitle> for volumes
+ *   <unitdate> (free text)                      field Tid
+ *   <physdesc><extent unit="vol.">              field Omfång ("26 vol.")
+ *   <physloc>                                   field Placering
+ *   <odd>                                       field Anmärkning
+ *
+ * The series are imported flat, as they are in the file. Their codes (F2, F2C, F2CC) follow
+ * allmänna arkivschemat, but the file does not nest them.
+ *
  * Archive data must not be lost on import, so a value that does not fit (a repeated code, a
  * reference to a node that does not exist) is kept as a field and reported as a warning.
  */
 
 import type { Knex } from 'knex';
-import type { EadMetadata, EadNode, EadProperty } from './ead.types';
+import type { EadArchive, EadMetadata, EadNode, EadProperty } from './ead.types';
 
 
 export type StructureType = 'klassificering' | 'arkivforteckning' | 'forvaring';
@@ -41,7 +62,23 @@ export interface ImportInput {
   structureType?: StructureType;
   /** Link the new structure(s) to this archive (archive_structures → arkivbildare). */
   archiveId?: number | null;
+  /**
+   * RA-EAD: the arkiv and arkivbildare described in the file. Used when archiveId is not given:
+   * the archive is looked up by name and created if it does not exist.
+   */
+  archive?: EadArchive | null;
   userId?: number | null;
+}
+
+/** The archive an RA-EAD import linked its structure to. */
+export interface ImportedArchive {
+  id: number;
+  name: string;
+  /** false = an archive with this name already existed and was reused. */
+  created: boolean;
+  creatorId: number;
+  creatorName: string;
+  creatorCreated: boolean;
 }
 
 export interface ImportedStructure {
@@ -57,6 +94,8 @@ export interface ImportResult {
   relationCount: number;
   createdNodeTypes: string[];
   warnings: string[];
+  /** Only for RA-EAD files imported without archiveId. */
+  archive?: ImportedArchive;
 }
 
 /** A tree in the file has already been imported. The route answers 409. */
@@ -132,7 +171,18 @@ const ELEMENT_SPECS: Record<string, PropertySpec> = {
   legalstatus:    { key: 'rattslig_status',       label: 'Rättslig status',       eadElement: 'legalstatus',    dataType: 'text',     isPublic: true,  repeatable: false },
   relation:       { key: 'lank',                  label: 'Länk',                  eadElement: 'dao',            dataType: 'url',      isPublic: true,  repeatable: true  },
   unitid:         { key: 'annan_beteckning',      label: 'Annan beteckning',      eadElement: 'did/unitid',     dataType: 'text',     isPublic: true,  repeatable: true  },
+  // RA-EAD (also written by WIIT's own EAD3 export for fields with these ead_element values)
+  unitdate:       { key: 'tid',                   label: 'Tid',                   eadElement: 'did/unitdate',   dataType: 'text',     isPublic: true,  repeatable: false },
+  physdesc:       { key: 'omfang',                label: 'Omfång',                eadElement: 'did/physdesc',   dataType: 'text',     isPublic: true,  repeatable: false },
+  unittitle_label: { key: 'titel_etikett',        label: 'Titel (etikett)',       eadElement: null,             dataType: 'text',     isPublic: true,  repeatable: false },
+  custodhist:     { key: 'historik',              label: 'Historik',              eadElement: 'custodhist',     dataType: 'longtext', isPublic: true,  repeatable: false },
 };
+
+/**
+ * Swedish names for node types that the import has to create. Only the two levels in the
+ * RA-EAD files are listed; any other unknown level keeps the name it has in the file.
+ */
+const TYPE_NAMES: Record<string, string> = { fonds: 'Arkiv', series: 'Serie', volym: 'Volym' };
 const UNITID_LABEL: PropertySpec = { key: 'beteckning_etikett', label: 'Etikett för beteckning', eadElement: null, dataType: 'text', isPublic: true, repeatable: false };
 const UNRESOLVED_REF: PropertySpec = { key: 'ead_referens', label: 'Olöst EAD-referens', eadElement: null, dataType: 'text', isPublic: false, repeatable: true };
 
@@ -171,8 +221,13 @@ function countNodes(nodes: EadNode[]): number {
  * recordkeepingentity). Other files hold one tree: when <archdesc> is a fonds or collection,
  * for example WIIT's own export, its children are the top nodes; otherwise <archdesc> is the
  * top node itself. Components next to Klara's wrappers are not imported and get a warning.
+ *
+ * RA-EAD (the old arkivförteckningar) always keeps <archdesc> as the top node, so the tree is
+ * Arkiv / Serie / Volym.
  */
-export function findTrees(root: EadNode, fallbackType: StructureType, warnings: string[]): Tree[] {
+export function findTrees(root: EadNode, fallbackType: StructureType, warnings: string[],
+  format: EadMetadata['format'] = 'ead3'): Tree[] {
+  if (format === 'ra-ead') return [{ structureType: fallbackType, wrapper: null, topNodes: [root] }];
   const wrapped = root.children.filter((c) => WRAPPERS[norm(c.otherlevel)]);
   if (wrapped.length > 0) {
     for (const other of root.children.filter((c) => !WRAPPERS[norm(c.otherlevel)])) {
@@ -201,7 +256,11 @@ export function findTrees(root: EadNode, fallbackType: StructureType, warnings: 
  */
 export async function importEad(knex: Knex, input: ImportInput): Promise<ImportResult> {
   const warnings: string[] = [];
-  const trees = findTrees(input.rootNode, input.structureType ?? 'klassificering', warnings);
+  const isRaEad = input.metadata.format === 'ra-ead';
+  // An RA-EAD file is always an arkivförteckning; an EAD3 file without Klara's wrappers is a
+  // klassificeringsstruktur unless the caller says otherwise
+  const trees = findTrees(input.rootNode, input.structureType ?? defaultStructureType(input.metadata), warnings,
+    input.metadata.format);
   const userId = input.userId ?? null;
 
   return knex.transaction(async (trx) => {
@@ -210,6 +269,9 @@ export async function importEad(knex: Knex, input: ImportInput): Promise<ImportR
       .select('id', 'code', 'structure_type', 'ead_level', 'ead_otherlevel', 'ead_unit_description');
     const usedTypeCodes = new Set(nodeTypes.map((t) => norm(t.code)));
     const createdNodeTypes: string[] = [];
+    const createdTypeIds = new Set<number>();
+    /** "parentTypeId|childTypeId" for every parent/child pair in the file, see node_type_rules below. */
+    const typePairs = new Set<string>();
 
     const propertyDefs: PropertyDefRow[] = await trx('property_definitions')
       .select('id', 'node_type_id', 'key', 'label', 'data_type', 'ead_element', 'is_repeatable');
@@ -235,7 +297,8 @@ export async function importEad(knex: Knex, input: ImportInput): Promise<ImportR
 
       // An unknown type is created rather than rejected, so one new level in Klara does not
       // stop the whole import. The warning tells the archivist to check its name and rules.
-      const name = (unitDescription || otherlevel || level).slice(0, 255);
+      const fileName = level === 'otherlevel' ? otherlevel! : level;
+      const name = (unitDescription || TYPE_NAMES[norm(fileName)] || fileName).slice(0, 255);
       let code = slug(name).slice(0, MAX.code);
       for (let i = 2; usedTypeCodes.has(code); i++) code = `${slug(name).slice(0, MAX.code - 4)}_${i}`;
       usedTypeCodes.add(code);
@@ -248,6 +311,7 @@ export async function importEad(knex: Knex, input: ImportInput): Promise<ImportR
       const id = insertId(await trx('node_types').insert({ ...row, name }, ['id']));
       nodeTypes.push({ id, ...row });
       createdNodeTypes.push(`${name} (${structureType})`);
+      createdTypeIds.add(id);
       return id;
     };
 
@@ -322,11 +386,22 @@ export async function importEad(knex: Knex, input: ImportInput): Promise<ImportR
     const refs: PendingRef[] = [];
     const imported: ImportedStructure[] = [];
 
+    // RA-EAD: the file says which arkiv and arkivbildare it belongs to
+    let archiveId = input.archiveId ?? null;
+    let importedArchive: ImportedArchive | undefined;
+    if (!archiveId && input.archive) {
+      importedArchive = await archiveFor(trx, input.archive, input.metadata.recordId, userId);
+      archiveId = importedArchive.id;
+    }
+
     for (const tree of trees) {
       const w = tree.wrapper;
       const name = (w?.name || (trees.length === 1 ? input.structureName : null)
         || input.metadata.titleProper || 'Importerad struktur').slice(0, 255);
-      const externalId = (w?.eadId || input.metadata.recordId || null)?.slice(0, MAX.external_id) ?? null;
+      // RA-EAD: <eadid> is not unique per file (GV.ead and LS.ead both have 5, the number of
+      // their arkivbildare), so the name is part of the id that stops a second import
+      const documentId = isRaEad ? `ra-ead:${input.metadata.recordId ?? ''}:${slug(name)}` : input.metadata.recordId;
+      const externalId = (w?.eadId || documentId || null)?.slice(0, MAX.external_id) ?? null;
 
       if (externalId) {
         const existing = await trx('structures').where({ external_id: externalId }).first('id', 'name');
@@ -356,16 +431,17 @@ export async function importEad(knex: Knex, input: ImportInput): Promise<ImportR
         created_by: userId, updated_by: userId,
       }, ['id']));
 
-      if (input.archiveId) {
-        await trx('archive_structures').insert({ archive_id: input.archiveId, structure_id: structureId, created_by: userId });
+      if (archiveId) {
+        await trx('archive_structures').insert({ archive_id: archiveId, structure_id: structureId, created_by: userId });
       }
 
       // external_id is unique per structure (002); a repeated @id is dropped with a warning
       const usedExternalIds = new Set<string>();
 
-      const insertNode = async (node: EadNode, parentId: number | null, sortOrder: number,
-        usedCodes: Set<string>): Promise<void> => {
+      const insertNode = async (node: EadNode, parentId: number | null, parentTypeId: number | null,
+        sortOrder: number, usedCodes: Set<string>): Promise<void> => {
         const nodeTypeId = await typeFor(node, tree.structureType);
+        if (parentTypeId !== null) typePairs.add(`${parentTypeId}|${nodeTypeId}`);
 
         // F6.1: reference_code is unique among siblings (008); a repeat is kept as a field instead
         let referenceCode = node.unitid?.trim() || null;
@@ -429,12 +505,12 @@ export async function importEad(knex: Knex, input: ImportInput): Promise<ImportR
 
         const childCodes = new Set<string>();
         let i = 0;
-        for (const c of node.children) await insertNode(c, nodeId, i++, childCodes);
+        for (const c of node.children) await insertNode(c, nodeId, nodeTypeId, i++, childCodes);
       };
 
       const topCodes = new Set<string>();
       let i = 0;
-      for (const top of tree.topNodes) await insertNode(top, null, i++, topCodes);
+      for (const top of tree.topNodes) await insertNode(top, null, null, i++, topCodes);
 
       imported.push({ id: structureId, code, name, structureType: tree.structureType, nodeCount: countNodes(tree.topNodes) });
     }
@@ -512,6 +588,18 @@ export async function importEad(knex: Knex, input: ImportInput): Promise<ImportR
       }
     }
 
+    // A node type the import created has no rules yet, so nothing could be added under it or
+    // of its kind afterwards (F3.1). The parent/child pairs found in the file become its rules.
+    // Rules of types that already existed are left as the archivist set them up.
+    for (const pair of typePairs) {
+      const [parentTypeId, childTypeId] = pair.split('|').map(Number) as [number, number];
+      if (!createdTypeIds.has(parentTypeId) && !createdTypeIds.has(childTypeId)) continue;
+      const rule = { parent_type_id: parentTypeId, child_type_id: childTypeId };
+      if (!(await trx('node_type_rules').where(rule).first('parent_type_id'))) {
+        await trx('node_type_rules').insert(rule);
+      }
+    }
+
     if (createdNodeTypes.length) {
       warnings.push(`Nya nodtyper skapades: ${createdNodeTypes.join(', ')}. Kontrollera namn och regler i administrationen.`);
     }
@@ -519,7 +607,7 @@ export async function importEad(knex: Knex, input: ImportInput): Promise<ImportR
     // Arkivlagen: it must be possible to trace what came into the system, when and from which file
     for (const s of imported) {
       await trx('transfer_jobs').insert({
-        direction: 'import', format: 'ead3', structure_id: s.id,
+        direction: 'import', format: isRaEad ? 'ra-ead' : 'ead3', structure_id: s.id,
         file_name: input.sourceFileName?.slice(0, 255) ?? null,
         status: 'done', node_count: s.nodeCount,
         message: warnings.length ? warnings.join('\n').slice(0, 4000) : null,
@@ -527,8 +615,62 @@ export async function importEad(knex: Knex, input: ImportInput): Promise<ImportR
       });
     }
 
-    return { structures: imported, relationCount, createdNodeTypes, warnings };
+    return {
+      structures: imported, relationCount, createdNodeTypes, warnings,
+      ...(importedArchive ? { archive: importedArchive } : {}),
+    };
   });
+}
+
+/** The structure type a file gets when the caller does not choose one. */
+export function defaultStructureType(metadata: EadMetadata): StructureType {
+  return metadata.format === 'ra-ead' ? 'arkivforteckning' : 'klassificering';
+}
+
+/**
+ * RA-EAD: finds the arkivbildare and the arkiv named in the file, or creates them.
+ *
+ * GV.ead and LS.ead have the same arkivbildare ("Malmö högskola 1998-2015"), so the second
+ * file reuses the creator that the first one made. It is matched on corpname/@authfilenumber
+ * first and on the name second. The archive is matched on its name under that creator.
+ * New rows are unpublished, like everything else an import creates.
+ */
+async function archiveFor(trx: Knex.Transaction, archive: EadArchive, recordId: string | null,
+  userId: number | null): Promise<ImportedArchive> {
+  const creatorName = (archive.creatorName || archive.name).slice(0, MAX.title);
+  const creatorExternalId = archive.creatorExternalId?.slice(0, MAX.external_id) || null;
+
+  const creators: Array<{ id: number; name: string; external_id: string | null }> =
+    await trx('archive_creators').select('id', 'name', 'external_id');
+  // "1998–2015" and "1998-2015" are the same name: an en dash is often typed for the hyphen
+  const key = (value: string): string => norm(value).replace(/[\u2010-\u2015]/g, '-');
+  let creator = (creatorExternalId && creators.find((c) => c.external_id === creatorExternalId))
+    || creators.find((c) => key(c.name) === key(creatorName));
+  const creatorCreated = !creator;
+  if (creator && !creator.external_id && creatorExternalId) {
+    // Found by name: remember the id from the file, so the next file matches on it
+    await trx('archive_creators').where({ id: creator.id }).update({ external_id: creatorExternalId });
+    creator.external_id = creatorExternalId;
+  }
+  if (!creator) {
+    const id = insertId(await trx('archive_creators').insert({
+      name: creatorName, creator_type: 'corporate', external_id: creatorExternalId,
+      created_by: userId, updated_by: userId,
+    }, ['id']));
+    creator = { id, name: creatorName, external_id: creatorExternalId };
+  }
+
+  const name = archive.name.slice(0, MAX.title);
+  const archives: Array<{ id: number; name: string }> =
+    await trx('archives').where({ archive_creator_id: creator.id }).select('id', 'name');
+  const existing = archives.find((a) => key(a.name) === key(name));
+  const id = existing ? existing.id : insertId(await trx('archives').insert({
+    archive_creator_id: creator.id, name, description: archive.description,
+    external_id: recordId?.slice(0, MAX.external_id) ?? null,
+    created_by: userId, updated_by: userId,
+  }, ['id']));
+
+  return { id, name: existing?.name ?? name, created: !existing, creatorId: creator.id, creatorName: creator.name, creatorCreated };
 }
 
 /** A mapper property (physloc, relation, odd …) → which field it is stored in. */
