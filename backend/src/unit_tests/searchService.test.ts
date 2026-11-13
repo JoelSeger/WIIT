@@ -563,7 +563,8 @@ describe('SearchService', () => {
                 result.results[0].matches.find((m) => m.field === 'description')?.snippet ?? '';
 
             expect(snippet).toContain('hello');
-            expect(snippet).toContain('...');
+            expect(snippet.startsWith('…')).toBe(true);
+            expect(snippet.endsWith('…')).toBe(true);
             expect(snippet.length).toBeLessThan(description.length);
         });
 
