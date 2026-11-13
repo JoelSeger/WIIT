@@ -12,8 +12,22 @@
     message: string;
   }
 
-  /** The document-level information in <control>. */
+  /**
+   * The two formats the import reads:
+   *   ead3    EAD3 (Klara's export of the informationshanteringsplan, WIIT's own export)
+   *   ra-ead  Riksarkivet's RA-EAD, an EAD 2002 variant (the old arkivförteckningar GV.ead / LS.ead)
+   */
+  export type EadFormat = "ead3" | "ra-ead";
+
+  /**
+   * RA-EAD has one unnamed <odd> per series and volume: its Anmärkning. This is the key of the
+   * field it is stored in. The RA-EAD export writes the same field back as a plain <odd>.
+   */
+  export const RA_EAD_NOTE_KEY = "anmarkning";
+
+  /** The document-level information in <control> (EAD3) or <eadheader> (RA-EAD). */
   export interface EadMetadata {
+    format: EadFormat;
     recordId: string | null;
     titleProper: string | null;
     edition: string | null;
@@ -75,8 +89,25 @@
     children: EadNode[];
   }
 
+  /**
+   * The arkiv and arkivbildare that an RA-EAD file describes in <archdesc level="fonds">.
+   * The import uses it to find or create the rows in archives / archive_creators.
+   */
+  export interface EadArchive {
+    /** <archdesc><did><unittitle>, e.g. "Gemensam förvaltning 1 juli 1998 - 2015". */
+    name: string;
+    /** <origination><corpname role="arkivbildare">, e.g. "Malmö högskola 1998-2015". */
+    creatorName: string | null;
+    /** corpname/@authfilenumber as written in the file, e.g. "/5". */
+    creatorExternalId: string | null;
+    /** <custodhist> followed by a fonds-level <odd>: the arkivbeskrivning / history text. */
+    description: string | null;
+  }
+
   /** Result of EadMapper.map: the metadata and the <archdesc> tree. */
   export interface MappedEad {
     metadata: EadMetadata;
     rootNode: EadNode | null;
+    /** Only set for RA-EAD files. */
+    archive: EadArchive | null;
   }

@@ -1,9 +1,12 @@
 /**
- * Express routes for EAD3 export.
+ * Express routes for EAD export.
  *
  *   GET /api/structures/:id/export/ead3            → public part only (no login needed)
  *   GET /api/structures/:id/export/ead3?full=true  → everything, incl. unpublished nodes
  *                                                     and is_public = 0 fields (needs editor/admin)
+ *   GET /api/structures/:id/export/ra-ead[?full=true]
+ *                                                  → the same, as RA-EAD (Riksarkivet's EAD 2002
+ *                                                     variant). Meant for arkivförteckningar.
  *
  * Every export is logged in transfer_jobs (Arkivlagen: traceability of what left the system).
  *
@@ -16,8 +19,9 @@
 
 import express, { type NextFunction, type Request, type RequestHandler, type Response, type Router } from 'express';
 import type { Knex } from 'knex';
-import { loadStructure, type TreeNode } from './loadStructure';
+import { loadStructure, type LoadedStructure, type TreeNode } from './loadStructure';
 import { buildEad3 } from './buildEad3';
+import { buildRaEad } from './buildRaEad';
 import logger from '../config/logger';
 
 /** What the auth middleware puts on req. Move this to src/middleware/auth.ts once that exists. */
@@ -33,6 +37,16 @@ export interface EadExportDeps {
 
 type TransferStatus = 'pending' | 'running' | 'done' | 'failed';
 
+/** One entry per export format: its URL segment and transfer_jobs.format, builder and file ending. */
+const EXPORT_FORMATS: Array<{
+  format: 'ead3' | 'ra-ead';
+  extension: string;
+  build: (loaded: LoadedStructure, publicOnly: boolean) => string;
+}> = [
+  { format: 'ead3', extension: 'ead3.xml', build: (loaded, publicOnly) => buildEad3(loaded, { publicOnly }) },
+  { format: 'ra-ead', extension: 'ead', build: (loaded) => buildRaEad(loaded) },
+];
+
 export function createEadExportRouter({ knex, requireRole }: EadExportDeps): Router {
   const router = express.Router();
 
@@ -42,52 +56,54 @@ export function createEadExportRouter({ knex, requireRole }: EadExportDeps): Rou
     return next();
   };
 
-  router.get('/structures/:id/export/ead3', chooseMode, async (req: MaybeAuthedRequest, res: Response, next: NextFunction) => {
-    const structureId = Number(req.params.id);
-    if (!Number.isInteger(structureId) || structureId <= 0) {
-      res.status(400).json({ error: 'Ogiltigt struktur-id' });
-      return;
-    }
-    const publicOnly = req.query.full !== 'true';
-    const userId = req.user?.id ?? null;
-
-    let jobId: number | null = null;
-    try {
-      // Must exist before logging: transfer_jobs.structure_id is a foreign key
-      const exists = await knex('structures').where({ id: structureId }).first('id');
-      if (!exists) {
-        res.status(404).json({ error: 'Strukturen finns inte eller är inte publicerad' });
+  for (const { format, extension, build } of EXPORT_FORMATS) {
+    router.get(`/structures/:id/export/${format}`, chooseMode, async (req: MaybeAuthedRequest, res: Response, next: NextFunction) => {
+      const structureId = Number(req.params.id);
+      if (!Number.isInteger(structureId) || structureId <= 0) {
+        res.status(400).json({ error: 'Ogiltigt struktur-id' });
         return;
       }
+      const publicOnly = req.query.full !== 'true';
+      const userId = req.user?.id ?? null;
 
-      const [job] = (await knex('transfer_jobs').insert({
-        direction: 'export', format: 'ead3', structure_id: structureId,
-        status: 'running', created_by: userId,
-      }, ['id'])) as Array<{ id: number } | number>;
-      // MSSQL/Postgres return { id }, some drivers return the bare id
-      jobId = typeof job === 'object' ? job.id : (job ?? null);
+      let jobId: number | null = null;
+      try {
+        // Must exist before logging: transfer_jobs.structure_id is a foreign key
+        const exists = await knex('structures').where({ id: structureId }).first('id');
+        if (!exists) {
+          res.status(404).json({ error: 'Strukturen finns inte eller är inte publicerad' });
+          return;
+        }
 
-      const loaded = await loadStructure(knex, structureId, { publicOnly });
-      if (!loaded) {
-        if (jobId != null) await finish(knex, jobId, 'failed', 0, 'Strukturen finns inte eller är inte publicerad');
-        res.status(404).json({ error: 'Strukturen finns inte eller är inte publicerad' });
-        return;
+        const [job] = (await knex('transfer_jobs').insert({
+          direction: 'export', format, structure_id: structureId,
+          status: 'running', created_by: userId,
+        }, ['id'])) as Array<{ id: number } | number>;
+        // MSSQL/Postgres return { id }, some drivers return the bare id
+        jobId = typeof job === 'object' ? job.id : (job ?? null);
+
+        const loaded = await loadStructure(knex, structureId, { publicOnly });
+        if (!loaded) {
+          if (jobId != null) await finish(knex, jobId, 'failed', 0, 'Strukturen finns inte eller är inte publicerad');
+          res.status(404).json({ error: 'Strukturen finns inte eller är inte publicerad' });
+          return;
+        }
+
+        const xml = build(loaded, publicOnly);
+        const fileName = `${loaded.structure.code}${publicOnly ? '' : '-full'}.${extension}`;
+        if (jobId != null) await finish(knex, jobId, 'done', countNodes(loaded.roots), null, fileName);
+
+        res.set('Content-Type', 'application/xml; charset=utf-8');
+        res.set('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.send(xml);
+      } catch (err) {
+        logger.error(err);
+        const message = err instanceof Error ? err.message : String(err);
+        if (jobId != null) await finish(knex, jobId, 'failed', null, message.slice(0, 4000)).catch(() => {});
+        next(err);
       }
-
-      const xml = buildEad3(loaded, { publicOnly });
-      const fileName = `${loaded.structure.code}${publicOnly ? '' : '-full'}.ead3.xml`;
-      if (jobId != null) await finish(knex, jobId, 'done', countNodes(loaded.roots), null, fileName);
-
-      res.set('Content-Type', 'application/xml; charset=utf-8');
-      res.set('Content-Disposition', `attachment; filename="${fileName}"`);
-      res.send(xml);
-    } catch (err) {
-      logger.error(err);
-      const message = err instanceof Error ? err.message : String(err);
-      if (jobId != null) await finish(knex, jobId, 'failed', null, message.slice(0, 4000)).catch(() => {});
-      next(err);
-    }
-  });
+    });
+  }
 
   return router;
 }

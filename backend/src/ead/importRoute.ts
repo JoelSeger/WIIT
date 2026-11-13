@@ -1,5 +1,6 @@
 /**
- * NF5: Express routes for EAD import.
+ * NF5: Express routes for EAD import. Both EAD3 and RA-EAD (EAD 2002) files are accepted; the
+ * format is detected from the file, so the same two routes are used for both.
  *
  *   POST /api/import/ead/preview   file=<xml>                       → what would be imported, writes nothing
  *   POST /api/import/ead           file=<xml> [structureName]
@@ -101,7 +102,8 @@ export function createEadImportRouter({ knex, requireRole }: EadImportDeps): Rou
         const message = err instanceof Error ? err.message : String(err);
         // Logged outside the transaction, which has been rolled back
         await knex('transfer_jobs').insert({
-          direction: 'import', format: 'ead3', file_name: fileName, status: 'failed',
+          // RA-EAD files have <eadheader>; checked on the text, since the file may not even parse
+          direction: 'import', format: /<eadheader[\s>]/.test(xml) ? 'ra-ead' : 'ead3', file_name: fileName, status: 'failed',
           message: message.slice(0, 4000), finished_at: knex.fn.now(), created_by: userId,
         }).catch(() => {});
 
