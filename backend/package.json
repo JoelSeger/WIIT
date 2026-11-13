@@ -16,7 +16,7 @@
     "seed:make": "node --import tsx node_modules/knex/bin/cli.js seed:make --knexfile knexfile.ts",
     "test": "jest",
     "test:ci": "jest --ci --coverage --watchAll=false",
-    "test:legacy": "tsx test/ead-export.test.ts && tsx test/ead-import.test.ts && tsx test/search.test.ts",
+    "test:legacy": "tsx test/ead-export.test.ts && tsx test/ead-import.test.ts && tsx test/ra-ead.test.ts && tsx test/search.test.ts && tsx test/auth.test.ts && tsx test/attributes.test.ts",
     "report:summarize": "tsx scripts/test_report.ts"
   },
   "keywords": [],
@@ -31,6 +31,8 @@
     "knex-stringcase": "^1.6.0",
     "mssql": "^12.7.9",
     "multer": "^2.4.0",
+    "pino": "^10.4.0",
+    "pino-pretty": "^13.2.0",
     "tedious": "^20.3.7"
   },
   "devDependencies": {
