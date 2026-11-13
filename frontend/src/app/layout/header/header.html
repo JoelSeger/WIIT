@@ -1,28 +1,23 @@
 <header class="header">
-  <div class="header-logo">
+  <a class="header-logo" routerLink="/" aria-label="Gå till startsidan">
     <img
       [src]="logoUrl"
       [alt]="logoAlt"
       class="logo"
-    />
+/>
+  </a>
 
-    <span class="university-name">Malmö Universitet</span>
-  </div>
+    <div class="header-user">
+      <span class="user-label">
+        @if (loginService.currentUser()) {
+          {{ loginService.currentUser() }}
+        } @else {
+          Besökare
+        }
+      </span>
 
-  <div class="header-user">
-    <span class="user-label">{{ userLabel }}</span>
-
-    <button
-      class="user-button"
-      type="button"
-      (click)="openProfile()"
-      aria-label="Användarprofil"
-    >
-      <img
-        [src]="profileIconUrl"
-        alt=""
-        class="profile-icon"
-      />
-    </button>
-  </div>
+      <button class="user-button" type="button" aria-label="Användarprofil">
+        <img [src]="profileIconUrl" alt="Profil" class="profile-icon" />
+      </button>
+    </div>
 </header>

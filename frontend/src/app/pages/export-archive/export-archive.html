@@ -1,0 +1,78 @@
+
+<main class="export-page">
+  <div class="export-content">
+    <h1>Exportera arkivinformation</h1>
+    <p>Exportera arkivbeskrivningar i EAD3/XML-format.</p>
+
+    <div class="export-options">
+      <label>
+        <input
+          type="radio"
+          name="exportType"
+          value="all"
+          [(ngModel)]="exportType"
+        >
+        Hela arkivet
+      </label>
+
+      <label>
+        <input
+          type="radio"
+          name="exportType"
+          value="archive"
+          [(ngModel)]="exportType"
+        >
+        En arkivförteckning
+      </label>
+
+      <label>
+        <input
+          type="radio"
+          name="exportType"
+          value="item"
+          [(ngModel)]="exportType"
+        >
+        En arkivpost
+      </label>
+    </div>
+
+    <div class="export-fields">
+      <label for="archive">Välj arkivförteckning</label>
+      <input
+        id="archive"
+        type="text"
+        placeholder="Ange ett struktur-ID"
+        [(ngModel)]="selectedArchive"
+      >
+
+      <label for="archive-item">Välj arkivpost</label>
+      <input
+        id="archive-item"
+        type="text"
+        placeholder="Exempeldata...."
+        [(ngModel)]="selectedItem"
+      >
+    </div>
+
+    <div class="export-format">
+      <img src="/icons/code-xml.svg" alt="" class="format-icon">
+      <p>Exportformat</p>
+      <p>EAD3/XML</p>
+      <small>Formatet är förvalt och kan inte ändras.</small>
+    </div>
+
+    <button 
+    class="export-button" 
+    type="button" 
+    (click)="exportArchive()">
+      Granska export / Exportera
+    </button>
+    @if (showNotification) {
+  <app-notification-popup
+    [type]="notificationType"
+    [message]="notificationMessage"
+    (closed)="showNotification = false">
+  </app-notification-popup>
+}
+  </div>
+</main>

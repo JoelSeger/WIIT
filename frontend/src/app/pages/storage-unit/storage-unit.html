@@ -1,0 +1,21 @@
+<section class="storage-unit">
+
+  <h1>FÖRVARINGSENHETER</h1>
+
+  <!--Displays all storage units-->
+  <div class="storage-list">
+    @for (unit of storageUnits; track unit) {
+      <button
+        class="storage-item"
+        type="button"
+        [class.selected]="selectedUnit === unit"
+        [attr.aria-pressed]="selectedUnit === unit"
+        (click)="selectUnit(unit)"
+      >
+        <img src="/Archive.png" alt="" />
+        <span>{{ unit }}</span>
+      </button>
+    }
+  </div>
+
+</section>

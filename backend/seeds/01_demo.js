@@ -39,6 +39,8 @@ exports.seed = async function (knex) {
   await knex('node_relations').del();
   await knex('relation_types').del();
   await knex('node_property_values').del();
+  await knex('node_activity_handlingstyp').del();   // NEW: checklist rows point at nodes (NO ACTION)
+  await knex('node_activities').del();               // NEW: activities point at nodes
   await knex('property_options').del();
   await knex('property_definitions').del();
   await knex('archive_structures').del();

@@ -5,19 +5,16 @@
       <img [src]="menuIconUrl" alt="" />
     </button>
 
-    <button class="nav-button" type="button"
-      (click)="addItem()" aria-label="Lägg till">
-      <img [src]="addIconUrl" alt="" />
+    <button class="nav-button" routerLink="/import-archive" aria-label="Lägg till">
+      <img [src]="addIconUrl" alt="Lägg till" />
     </button>
 
-    <button class="nav-button" type="button"
-      (click)="goHome()" aria-label="Startsida">
-      <img [src]="homeIconUrl" alt="" />
+    <button class="nav-button" routerLink="/"  aria-label="Startsida">
+      <img [src]="homeIconUrl" alt="Startsida" />
     </button>
 
-    <button class="nav-button" type="button"
-      (click)="download()" aria-label="Ladda ner">
-      <img [src]="downloadIconUrl" alt="" />
+    <button class="nav-button" routerLink="/export-archive" aria-label="Ladda ner">
+      <img [src]="downloadIconUrl" alt="Ladda ner" />
     </button>
   </div>
 
@@ -32,25 +29,35 @@
 
     @if (searchSuggestions.length > 0) {
       <div class="search-suggestions">
-        @for (item of searchSuggestions; track item) {
+        @for (result of searchSuggestions; track result.nodeId) {
           <button
             type="button"
-            (click)="selectSuggestion(item)"
+            (click)="selectSuggestion(result)"
           >
-            {{ item }}
+            <span>{{ result.referenceCode ? result.referenceCode + ' ' : '' }}{{ result.title }}</span>
+            <small class="result-structure">{{ result.structureName }}</small>
           </button>
         }
         </div>
+        } @else if (searchCompleted && searchText.trim().length >= 3) {
+
+    <p class="no-results">Inga sökresultat hittades</p>
       }
       </div>
     
   
 
   <div class="nav-right">
-    <button class="nav-button" type="button"
-      (click)="logout()" aria-label="Logga ut">
-      <img [src]="logoutIconUrl" alt="" />
-    </button>
+    @if (loginService.currentUser()) {
+      <button class="nav-button" type="button" (click)="loginService.logout()" aria-label="Logga ut">
+        <img [src]="logoutIconUrl" alt="Logga ut" />
+      </button>
+
+    } @else {
+      <a routerLink="/login" class="nav-button" aria-label="Logga in">
+        <img [src]="loginIconUrl" alt="Logga in" />
+      </a>
+    }
   </div>
 </nav>
 
