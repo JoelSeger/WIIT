@@ -4,7 +4,7 @@ const transport = pino.transport({
   targets: [
     {
       target: 'pino/file',
-      options: { destination: `./logs/server.log` },
+      options: { destination: './logs/server.log', mkdir: true },
     },
   ],
 });

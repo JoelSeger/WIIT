@@ -8,26 +8,36 @@ export function attachUser(req: Request, _res: Response, next: NextFunction): vo
 
 export function authenticate(req: Request, res: Response, next: NextFunction): void {
   if (!req.user) {
-    logger.warn(req.user, 'Unauthorized')
-    res.status(401).json({ error: 'Unauthorized' });
+    logger.warn({ method: req.method, url: req.originalUrl }, 'Unauthorized');
+    res.status(401).json({ success: false, error: 'Unauthorized' });
     return;
   }
   next();
 }
 
-// TODO: look the user's AD groups up in ad_group_roles
-/** true/false instead of 403 – for endpoints that answer everyone but show more to some (e.g. search). */
+/**
+ * true/false instead of 403 – for endpoints that answer everyone but show more to some (e.g. search).
+ * The roles were looked up in ad_group_roles at login (AuthService.login) and stored in the session.
+ */
 export function hasRole(req: Request, ...roles: string[]): boolean {
   if (process.env.NODE_ENV !== 'production' && process.env.AUTH_DISABLED === 'true') return true;
-  return roles.some((r) => req.user?.adObjectId?.includes(r));
+  const mine = req.user?.roles ?? [];
+  // admin may do everything an editor may
+  return mine.includes('admin') || roles.some((r) => mine.includes(r));
 }
 
+/**
+ * 401 = not logged in (the frontend should send the user to login),
+ * 403 = logged in but missing the role.
+ */
 export const requireRole = (...roles: string[]): RequestHandler =>
   (req, res, next) => {
-    if (!hasRole(req, ...roles)) {
-      logger.warn(req.user, 'Forbidden');
-      res.status(403).json({ error: 'Forbidden' });
+    if (hasRole(req, ...roles)) { next(); return; }
+    if (!req.user) {
+      logger.warn({ method: req.method, url: req.originalUrl }, 'Unauthorized');
+      res.status(401).json({ success: false, error: 'Unauthorized' });
       return;
     }
-    next();
+    logger.warn({ method: req.method, url: req.originalUrl, userId: req.user.id, roles: req.user.roles }, 'Forbidden');
+    res.status(403).json({ success: false, error: 'Forbidden' });
   };
