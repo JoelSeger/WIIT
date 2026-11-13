@@ -14,7 +14,7 @@
     "migrate:status":   "node --import tsx node_modules/knex/bin/cli.js migrate:status --knexfile knexfile.ts",
     "seed":             "node --import tsx node_modules/knex/bin/cli.js seed:run --knexfile knexfile.ts",
     "seed:make":        "node --import tsx node_modules/knex/bin/cli.js seed:make --knexfile knexfile.ts",
-    "test": "tsx test/ead-export.test.ts && tsx test/ead-import.test.ts && tsx test/search.test.ts"
+    "test": "tsx test/ead-export.test.ts && tsx test/ead-import.test.ts && tsx test/search.test.ts && tsx test/auth.test.ts"
   },
   "keywords": [],
   "type": "commonjs",
