@@ -1,0 +1,85 @@
+<div class="import-container">
+    <header class="import-header">
+        <h1>Importera arkiv</h1>
+        <p>Ladda upp en EAD-fil (XML) för att importera strukturer och noder till arkivet.</p>
+    </header>
+
+    @if (errorMessage()) {
+        <div class="error-message">{{ errorMessage() }}</div>
+    }
+
+    <form (ngSubmit)="onSubmit()">
+        <div
+            class="drop-zone"
+            [class.dragging]="isDragging"
+            [class.has-file]="selectedFile"
+            (dragover)="onDragOver($event)"
+            (dragleave)="onDragLeave($event)"
+            (drop)="onDrop($event)"
+            (click)="fileInput.click()">
+
+          <input #fileInput type="file" (change)="onFileSelected($event)" hidden accept=".xml,.ead,.ead3" />
+
+            @if (!selectedFile) {
+                <div class="drop-content">
+                    <svg class="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0L8 12m4-4v12"></path></svg>
+                        <p><strong>Dra din EAD-fil hit</strong></p>
+                  <p class="subtext">eller klicka för att välja fil från datorn (.xml, .ead, .ead3)</p>
+                    </div>
+            } @else {
+                <div class="drop-content file-selected">
+                    <svg class="file-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4a1 1 0 011-1h8a1 1 0 011 1v12m-4-4l-4-4m0 0L8 12m4-4v12"></path></svg>
+                    <p><strong>{{ selectedFile.name }}</strong></p>
+                    <p class="subtext">Klicka för att byta fil</p>
+                </div>
+                }
+        </div>
+
+        <div class="form-actions">
+            <button type="button" class="btn btn-outline" routerLink="/">Avbryt</button>
+            <button type="submit" class="btn btn-primary" [disabled]="isUploading() || !selectedFile">
+                {{ isUploading() ? 'Importerar...' : 'Importera' }}
+            </button>
+        </div>
+    </form>
+
+    @if (importResult(); as result) {
+        <div class="result-panel">
+            <h2><span class="icon">Importen lyckades!</span></h2>
+
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <span class="stat-number">{{ result.structures.length }}</span>
+                    <span class="stat-label">Nya strukturer</span>
+                </div>
+
+                <div class="stat-box">
+                    <span class="stat-number">{{ result.relationCount }}</span>
+                    <span class="stat-label">Relationer</span>
+                </div>
+            </div>
+
+            <div class="structure-list">
+                <h3>Skapade strukturer:</h3>
+                <ul>
+                    @for (structure of result.structures; track structure.id) {
+                      <li>{{ structure.name }} <span>(id {{ structure.id }}, {{ structure.nodeCount }} noder)</span></li>
+                    }
+                </ul>
+            </div>
+
+            @if (result.warnings && result.warnings.length > 0) {
+                <div class="alert alert-warning">
+                    <h3>Varningar under importen:</h3>
+                    <ul>
+                        @for (warning of result.warnings; track $index) {
+                            <li>{{ warning }}</li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    }
+</div>

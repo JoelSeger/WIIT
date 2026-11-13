@@ -105,6 +105,7 @@ interface ArchiveQueryRow {
   is_published: DbBool;
   creator_id: number;
   creator_name: string;
+  creator_external_id: string | null;
   creator_type: CreatorType;
   creator_start_year: number | null;
   creator_end_year: number | null;
@@ -164,6 +165,8 @@ export interface TreeNode {
 export interface ArchiveCreator {
   id: number;
   name: string;
+  /** Authority id from the source system, e.g. corpname/@authfilenumber in RA-EAD. */
+  external_id: string | null;
   type: CreatorType;
   start_year: number | null;
   end_year: number | null;
@@ -261,7 +264,7 @@ async function loadArchive(knex: Knex, structureId: number, publicOnly: boolean)
     .select(
       'a.id', 'a.reference_code', 'a.name', 'a.start_year', 'a.end_year', 'a.description',
       'a.external_id', 'a.is_published',
-      'c.id as creator_id', 'c.name as creator_name', 'c.creator_type',
+      'c.id as creator_id', 'c.name as creator_name', 'c.external_id as creator_external_id', 'c.creator_type',
       'c.start_year as creator_start_year', 'c.end_year as creator_end_year',
       'c.description as creator_description', 'c.is_published as creator_is_published',
     )
@@ -282,6 +285,7 @@ async function loadArchive(knex: Knex, structureId: number, publicOnly: boolean)
     creator: showCreator ? {
       id: row.creator_id,
       name: row.creator_name,
+      external_id: row.creator_external_id ?? null,
       type: row.creator_type,
       start_year: row.creator_start_year,
       end_year: row.creator_end_year,
