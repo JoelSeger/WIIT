@@ -1,6 +1,6 @@
 /**
  * The WIIT tables in SQLite, for tests that run without SQL Server.
- * Same columns as the MSSQL migrations 001–010, without MSSQL-only details
+ * Same columns as the MSSQL migrations 001–011, without MSSQL-only details
  * (filtered unique indexes, CHECK constraints, foreign keys).
  * Add a column here when a migration adds one.
  */
@@ -39,6 +39,7 @@ export async function createTables(knex: Knex): Promise<void> {
   await knex.schema.createTable('node_types', (t) => {
     t.increments('id'); t.string('code'); t.string('name'); t.string('structure_type');
     t.string('ead_level'); t.string('ead_otherlevel'); t.string('ead_unit_description');   // 010
+    t.boolean('is_active').defaultTo(true);
   });
   await knex.schema.createTable('node_type_rules', (t) => { t.integer('parent_type_id'); t.integer('child_type_id'); });
   await knex.schema.createTable('nodes', (t) => {
@@ -52,6 +53,7 @@ export async function createTables(knex: Knex): Promise<void> {
     t.increments('id'); t.integer('node_type_id'); t.string('key'); t.string('label'); t.string('data_type');
     t.boolean('is_public').defaultTo(true); t.string('ead_element'); t.text('help_text'); t.integer('sort_order').defaultTo(0);
     t.boolean('is_required').defaultTo(false); t.boolean('is_active').defaultTo(true); t.boolean('is_repeatable').defaultTo(false);   // 008
+    t.string('tab_key'); t.string('group_key'); t.boolean('has_own_published').defaultTo(false);   // 011
   });
   await knex.schema.createTable('property_options', (t) => {          // migration 009
     t.increments('id'); t.integer('property_definition_id'); t.string('value');
@@ -61,6 +63,14 @@ export async function createTables(knex: Knex): Promise<void> {
     t.increments('id'); t.integer('node_id'); t.integer('property_definition_id'); t.text('value_text');
     t.decimal('value_number'); t.date('value_date'); t.boolean('value_boolean'); t.integer('updated_by');
     t.integer('value_order').defaultTo(0); t.datetime('updated_at');   // value_order: 008
+    t.boolean('is_own'); t.text('published_text');   // 011
+  });
+  await knex.schema.createTable('node_activities', (t) => {          // migration 011
+    t.increments('id'); t.integer('node_id'); t.string('name'); t.text('description');
+    t.integer('structure_unit_node_id'); t.string('structure_unit_text'); t.integer('sort_order').defaultTo(0);
+  });
+  await knex.schema.createTable('node_activity_handlingstyp', (t) => {   // migration 011
+    t.integer('activity_id'); t.integer('handlingstyp_node_id'); t.primary(['activity_id', 'handlingstyp_node_id']);
   });
   await knex.schema.createTable('relation_types', (t) => {
     t.increments('id'); t.string('code'); t.string('name'); t.string('inverse_name'); t.string('ead_element'); t.boolean('is_active').defaultTo(true);
