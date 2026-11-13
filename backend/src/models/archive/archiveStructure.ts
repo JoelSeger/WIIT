@@ -5,5 +5,5 @@ export interface ArchiveStructure {
   validFrom: Date;
   validTo: Date;
   createdAt: Date;
-  createdBy: number;
+  createdBy: number | null;
 }
