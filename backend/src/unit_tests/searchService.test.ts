@@ -5,6 +5,14 @@
  tested separately in searchRepository.test.ts against a real in-memory
  SQLite DB.
  Test Naming Convention: _TCnnn_<function>_<description> for verification-doc match.
+
+ IMPORTANT : test IDs are permanent!!
+  - never renumber, reuse or swap an existing TC id, not even to "tidy up" the order.
+    The id links the test to the verification doc and to every old test report.
+  - a new test always gets the next free number across ALL files in src/unit_tests
+    (check the highest TC id first), no matter where in the file it is placed.
+  - if a test is removed, its id is retired and not given to another test.
+  - renaming the description part is ok, the TCnnn part stays.
  */
 
 
