@@ -168,4 +168,18 @@ export class NodeRepository extends CrudRepository<Node> {
       updatedBy: row.updatedBy,
     };
   }
+
+  async flipPublished(nodeId: number): Promise<Node> {
+      const node = await this.qb.where("id", nodeId).select().first();
+
+      if (!node) {
+          throw new Error(`Node with id: ${nodeId} does not exist`)
+      }
+
+      const nextStatus = !node.is_published;
+      node.is_published = nextStatus;
+
+      await this.qb.where("id", nodeId).update({ is_published: nextStatus });
+      return node;
+  }
 }

@@ -7,6 +7,8 @@ import type { Node } from "../models/node/node";
 import type { NodeForm } from "../types/node.properties.types";
 import type { EditNodeRequest, NodeAttributeChanges } from "../types/nodeEdit.types";
 
+import { ChangeLog } from "../models/changeLog";
+
 /** What is written to change_log: only the things that really changed, old and new. */
 type Snapshot = Record<string, unknown>;
 
@@ -24,10 +26,10 @@ type Snapshot = Record<string, unknown>;
  * (moving a node is a separate function) and is_published (publishing is a separate function).
  */
 export class NodeEditService {
-  private readonly properties: NodePropertyService;
+    private readonly properties: NodePropertyService;
 
   constructor(private readonly knex: Knex) {
-    this.properties = new NodePropertyService(knex);
+      this.properties = new NodePropertyService(knex);
   }
 
   async editNode(request: EditNodeRequest): Promise<NodeForm> {
@@ -64,11 +66,11 @@ export class NodeEditService {
       }
 
       // --- 4. traceability -----------------------------------------------------------------
-      await new ChangeLogRepository(this.knex, trx).logNodeUpdate({
-        nodeId: node.id,
+      await new ChangeLogRepository(this.knex).record({
+        entityId: node.id,
         structureId: node.structureId,
-        oldValue: oldValues,
-        newValue: newValues,
+        oldValue: JSON.stringify(oldValues),
+        newValue: JSON.stringify(newValues),
         changedBy: request.updatedBy,
       });
     });
@@ -128,5 +130,22 @@ export class NodeEditService {
   private toDateString(d: unknown): string | null {
     if (!d) return null;
     return d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10);
+  }
+
+  async publishUnpublishNode(nodeId: number, userId: number) {
+      const node = new NodeRepository(this.knex);
+      const change = new ChangeLogRepository(this.knex);
+      const newNode = await node.flipPublished(nodeId);
+      const changeLog: Omit<ChangeLog, "id" | "changedAt"> = {
+        entityType: newNode.title,
+        entityId: newNode.id,
+        structureId: newNode.structureId,
+        action: "Update Publish",
+        oldValue: (!newNode.isPublished!).toString(),
+        newValue: newNode.isPublished!.toString(),
+        comment: "Changed the published status",
+        changedBy: userId,
+      }
+      change.record(changeLog);
   }
 }

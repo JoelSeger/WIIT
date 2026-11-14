@@ -44,10 +44,10 @@ export class NodeDeleteService {
         const deleted = await nodes.delete(node.id);
         if (!deleted) throw new NotFoundError(`Node ${request.nodeId} was not found`);
 
-        await new ChangeLogRepository(this.knex, trx).logNodeDelete({
-          nodeId: node.id,
+        await new ChangeLogRepository(this.knex).record({
+          entityId: node.id,
           structureId: node.structureId,
-          oldValue: {
+          oldValue: JSON.stringify({
             parentId: node.parentId,
             nodeTypeId: node.nodeTypeId,
             referenceCode: node.referenceCode,
@@ -64,7 +64,7 @@ export class NodeDeleteService {
               fromNodeId: r.fromNodeId,
               toNodeId: r.toNodeId,
             })),
-          },
+            }),
           changedBy: request.deletedBy,
         });
 

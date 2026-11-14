@@ -156,4 +156,18 @@ export class NodePropertyController extends BaseController {
     if (!Number.isInteger(id) || id <= 0) throw new ValidationError("A valid node id is required");
     return id;
   }
+
+  async publishUnpublishNode(req: Request, res: Response) {
+      const nodeId = this.nodeId(req);
+      const user = req.session.user;
+      if (!user) {
+          this.unauthorized(res);
+          return;
+      }
+      if (!user.id) {
+          this.unauthorized(res);
+          return;
+      }
+      this.editing.publishUnpublishNode(nodeId, user.id)
+  }
 }

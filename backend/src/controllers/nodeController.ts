@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import { BaseController } from "./baseController";
-import { NodeService } from "../services/nodeService";
+import { NodeTreeService } from "../services/nodeTreeService";
 
 export class NodeController extends BaseController {
-  constructor(private readonly nodeService: NodeService) {
+  constructor(private readonly nodeService: NodeTreeService) {
     super();
   }
 
