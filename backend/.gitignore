@@ -4,3 +4,8 @@ dist/
 .env.*
 out/
 *.log
+
+# Generated test output
+coverage/
+# Local test reports are ignored; only CI commits the dated test-summary_*.md on develop
+src/unit_tests/reports/*
