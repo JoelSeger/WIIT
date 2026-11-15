@@ -46,4 +46,24 @@ export class ChangeLogRepository extends CrudRepository<ChangeLog> {
       changedAt: new Date(),
     });
   }
+
+  /** F1.1.2: one row per structure edit. */
+  async logStructureUpdate(entry: {
+    structureId: number;
+    oldValue: unknown;
+    newValue: unknown;
+    changedBy: number | null;
+  }): Promise<void> {
+    await this.qb.insert({
+      entityType: "structure",
+      entityId: entry.structureId,
+      structureId: +entry.structureId,
+      action: "update",
+      oldValue: JSON.stringify(entry.oldValue),
+      newValue: JSON.stringify(entry.newValue),
+      comment: null,
+      changedBy: entry.changedBy,
+      changedAt: new Date(),
+    });
+  }
 }
