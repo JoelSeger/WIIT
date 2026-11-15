@@ -2,10 +2,12 @@
  Unit tests for NodeActivityService (the Aktiviteter tab of a process node).
  Like the structure service it builds its own repositories, so NodeRepository,
  NodeTypeRepository and NodeActivityRepository are replaced with jest.mock.
- knex.transaction runs the callback right away with a jest.fn() as trx. Nothing here
- touches any db.
- Covers list (mapping + checklist ids) and the main paths of replace: wrong node type and
- a full replace with sort order and trimming.
+ knex.transaction runs the callback right away with a jest.fn() as trx, which gives back
+ a fake query builder (makeQuery) for the two raw checks in replace. Nothing here touches
+ any db.
+ Covers list (missing node, mapping + checklist ids) and replace from start to end: missing
+ node, wrong or missing node type, the checklist and strukturenhet checks, ids used twice,
+ blank names and a full replace with sort order and trimming.
 
 
  Test Naming Convention: _TCnnn_<function>_<description> (for verification-doc match!)
@@ -27,7 +29,7 @@ import type { NodeType } from '../models/node/nodeType';
 import { NodeActivityRepository } from '../repos/nodeActivityRepository';
 import { NodeRepository } from '../repos/nodeRepository';
 import { NodeTypeRepository } from '../repos/nodeTypeRepository';
-import { ValidationError } from '../services/errorService';
+import { NotFoundError, ValidationError } from '../services/errorService';
 import { NodeActivityService } from '../services/nodeActivityService';
 
 
@@ -81,6 +83,21 @@ const makeActivity = (overrides: Partial<NodeActivity> = {}): NodeActivity => ({
     sortOrder: 0,
     ...overrides,
 });
+
+// fake knex query builder for the raw trx(...) queries in replace:
+// every chain method returns the same object and select() gives back the rows
+const makeQuery = (rows: { id: number }[]) => {
+    const q = {
+        join: jest.fn(),
+        where: jest.fn(),
+        whereIn: jest.fn(),
+        select: jest.fn().mockResolvedValue(rows),
+    };
+    q.join.mockReturnValue(q);
+    q.where.mockReturnValue(q);
+    q.whereIn.mockReturnValue(q);
+    return q;
+};
 
 
 // ──────────────────────────────────────
@@ -180,6 +197,19 @@ describe('NodeActivityService', () => {
             ]);
         });
 
+
+        /*
+         Verifies that asking for the activities of a node that doesn't exist throws
+         a NotFoundError, and no activities are loaded.
+         */
+        test('_TC063_list_throwsWhenNodeMissing', async () => {
+            nodes.findById.mockResolvedValue(undefined);
+
+            await expect(service.list(999)).rejects.toThrow(NotFoundError);
+            await expect(service.list(999)).rejects.toThrow('Node 999 was not found');
+            expect(activities.findByNodeId).not.toHaveBeenCalled();
+        });
+
     });
 
 
@@ -237,10 +267,121 @@ describe('NodeActivityService', () => {
 
             });
 
-            expect(activities.addHandlingstyp).toHaveBeenCalledWith(60, []);
+            expect(activities.addHandlingstyp).toHaveBeenCalledWith(60,[]);
             expect(activities.addHandlingstyp).toHaveBeenCalledWith(61, []);
             expect(trx).not.toHaveBeenCalled();
             expect(result.map((a) =>a.id)).toEqual([60, 61]);
+        });
+
+
+
+        /*
+         Verifies that replace on a node that doesn't exist throws NotFoundError
+         and the old activities are left alone (nothing deleted).
+         */
+        test('_TC064_replace_throwsWhenNodeMissing', async () =>{
+            nodes.findById.mockResolvedValue(undefined);
+
+            await expect(service.replace(999, [])).rejects.toThrow(NotFoundError);
+            expect(activities.deleteByNodeId).not.toHaveBeenCalled();
+
+        });
+
+
+        /*
+         Verifies that a node whose node type can't be found is treated like a node type
+         without activities, ValidationError and nothing deleted.
+         */
+        test('_TC065_replace_rejectsWhenNodeTypeMissing', async () => {
+            nodeTypes.findOne.mockResolvedValue(undefined);
+
+            await expect(service.replace(1, [{ name: 'X' }])).rejects.toThrow('This node type has no activities');
+            expect(activities.deleteByNodeId).not.toHaveBeenCalled();
+
+        });
+
+
+        /*
+         Verifies the checklist check: if one of the ticked ids is not a handlingstyp under
+         this process the query finds fewer rows than asked for, and we get a ValidationError
+         before anything is deleted.
+         */
+        test('_TC066_replace_rejectsChecklistIdOutsideTheProcess', async () => {
+            const checklistQuery = makeQuery([{ id: 7 }]); // asked for 7 and 8, only 7 belongs here
+            trx.mockReturnValueOnce(checklistQuery);
+
+            await expect(
+                service.replace(1, [{name: 'Diarieföra', handlingstypNodeIds: [7, 8] }]),
+            ).rejects.toThrow('The checklist may only contain handlingstyp nodes that belong to this process');
+
+            expect(trx).toHaveBeenCalledWith('nodes as n');
+            expect(checklistQuery.where).toHaveBeenCalledWith('hs.parent_id', 1);
+            expect(checklistQuery.where).toHaveBeenCalledWith('t.code', 'handlingstyp');
+            expect(checklistQuery.whereIn).toHaveBeenCalledWith('n.id', [7, 8]);
+            expect(activities.deleteByNodeId).not.toHaveBeenCalled();
+
+        });
+
+
+        /*
+         Verifies the strukturenhet check: a structureUnitNodeId that points at a node of
+         another type is not found by the query, so we get a ValidationError and nothing
+         is deleted.
+         */
+        test('_TC067_replace_rejectsStructureUnitOfWrongType', async() =>{
+            const unitQuery = makeQuery([]);
+            trx.mockReturnValueOnce(unitQuery);
+
+            await expect(
+                service.replace(1, [{ name: 'Diarieföra', structureUnitNodeId: 99 }]),
+            ).rejects.toThrow('structureUnitNodeId must be a strukturenhet node');
+
+            expect(unitQuery.where).toHaveBeenCalledWith('t.code', 'strukturenhet');
+            expect(unitQuery.whereIn).toHaveBeenCalledWith('n.id', [99]);
+            expect(activities.deleteByNodeId).not.toHaveBeenCalled();
+        });
+
+
+        /*
+         Verifies that ids used more than once are only checked once: two activities share
+         a checklist id and a strukturenhet, so each query gets the unique ids. Also the
+         checklist of one activity is saved without its duplicate.
+         */
+        test('_TC068_replace_checksEachIdOnlyOnce', async () => {
+            const checklistQuery = makeQuery([{ id: 7 }, { id: 8 }]);
+            const unitQuery = makeQuery([{ id: 70 }]);
+            trx.mockReturnValueOnce(checklistQuery).mockReturnValueOnce(unitQuery);
+            activities.create
+                .mockResolvedValueOnce(makeActivity({ id: 60 }))
+                .mockResolvedValueOnce(makeActivity({id: 61 }));
+
+            await service.replace(1, [
+                { name: 'Diarieföra', handlingstypNodeIds: [7,7, 8], structureUnitNodeId: 70 },
+                { name: 'Arkivera', handlingstypNodeIds: [8], structureUnitNodeId: 70 },
+
+            ]);
+
+            expect(checklistQuery.whereIn).toHaveBeenCalledWith('n.id', [7, 8]);
+            expect(unitQuery.whereIn).toHaveBeenCalledWith('n.id', [70]);
+            expect(activities.create).toHaveBeenNthCalledWith(1, expect.objectContaining({ structureUnitNodeId: 70 }));
+            expect(activities.addHandlingstyp).toHaveBeenCalledWith(60, [7, 8]);
+            expect(activities.addHandlingstyp).toHaveBeenCalledWith (61, [8]);
+        });
+
+
+        /*
+         Verifies that every activity needs a name, a blank one gives a ValidationError.
+         Note: the old list is already deleted at that point, in the real db the
+         transaction rolls that back, here we only check that the bad one is never created.
+         */
+        test('_TC069_replace_rejectsActivityWithBlankName', async () => {
+            activities.create.mockResolvedValueOnce(makeActivity({ id: 60 }));
+
+            await expect(
+                service.replace(1, [{ name: 'Diarieföra' }, { name: '   ' }]),
+            ).rejects.toThrow('Every activity needs a name');
+
+            expect(activities.create).toHaveBeenCalledTimes(1);
         });
 
     });

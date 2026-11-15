@@ -4,8 +4,10 @@
  repository modules are replaced with jest.mock and every "new" gets back a plain object
  full of jest.fn(). knex.transaction is faked too, it just runs the callback right away
  with a dummy trx. Nothing here touches any db.
- Covers the main paths of create: the code check, the duplicate code check, linking to an
- existing archive, making a new creator + new archive, and the defaults a new structure gets.
+ Covers create from start to end: the checks on code and name, the duplicate code check,
+ picking an existing archive or making a new one, picking an existing archive creator or
+ making a new one, the "both/neither given" checks, the default values the new structure
+ gets and the link row between archive and structure.
 
 
  Test Naming Convention: _TCnnn_<function>_<description> (for verification-doc match!)
@@ -230,6 +232,7 @@ describe('StructureCreationService', () =>{
 
 
 
+
     describe('create - new archive', () => {
 
         /*
@@ -238,7 +241,7 @@ describe('StructureCreationService', () =>{
          optional fields fall back to null. The archive points at the new creator, the link
          row uses the new archive, and the new creator comes back in the result.
          */
-        test('_TC049_create_makesNewCreatorAndNewArchive', async () => {
+        test('_TC049_create_makesNewCreatorAndNewArchive', async () =>{
             const request = makeRequest({
                 archiveId: undefined,
                 newArchiveCreator: { name: 'Ny bildare', startYear: 1990 },
@@ -247,7 +250,6 @@ describe('StructureCreationService', () =>{
             });
 
             const result = await service.create(request);
-
             expect(creators.create).toHaveBeenCalledWith({
                 parentId: null,
                 creatorType: 'corporate',
@@ -259,7 +261,7 @@ describe('StructureCreationService', () =>{
                 isPublished: false,
                 createdAt: expect.any(Date),
                 createdBy: 7,
-                updatedAt: expect.any(Date),
+                updatedAt:expect.any(Date),
                 updatedBy: 7,
             });
 
@@ -271,6 +273,218 @@ describe('StructureCreationService', () =>{
             expect(result.archive.id).toBe(21);
 
         });
+
+
+        /*
+         Verifies that a new archive can also use an archive creator that already exists:
+         the creator is looked up, the archive gets its id and no new creator is made.
+         The referenceCode is left out, so the archive gets null for it.
+         */
+        test('_TC053_create_makesNewArchiveWithExistingCreator', async () =>{
+            creators.findById.mockResolvedValue(makeCreator());
+
+            const request = makeRequest({
+                archiveId: undefined,
+                archiveCreatorId: 30,
+                newArchive: { name: 'Nytt arkiv' } as unknown as CreateStructureRequest['newArchive'],
+
+            });
+
+            const result = await service.create(request);
+            expect(creators.findById).toHaveBeenCalledWith(30);
+            expect(creators.create).not.toHaveBeenCalled();
+            expect(archives.create).toHaveBeenCalledWith(
+                expect.objectContaining({ archiveCreatorId: 30, referenceCode: null, name: 'Nytt arkiv' }),
+            );
+
+            expect(result.archiveCreator).toBeUndefined();
+
+        });
+
+
+        /*
+         Verifies that archiveCreatorId and newArchiveCreator can't both be sent,
+         same rule as for the archive. Nothing is looked up or created.
+         */
+        test('_TC054_create_rejectsCreatorIdTogetherWithNewCreator', async () => {
+            const request = makeRequest({
+                archiveId: undefined,
+                archiveCreatorId: 30,
+                newArchiveCreator: { name: 'Ny bildare' },
+                newArchive: { referenceCode: 'SE/NY', name: 'Nytt arkiv' },
+
+            });
+
+            await expect(service.create(request)).rejects.toThrow(
+                'Provide either archiveCreatorId or newArchiveCreator, not both.',
+            );
+            expect(creators.findById).not.toHaveBeenCalled();
+            expect(archives.create).not.toHaveBeenCalled();
+        });
+
+
+        /*
+         Verifies that an archiveCreatorId that doesn't exist gives a NotFoundError,
+         and the archive and structure are never created.
+         */
+        test('_TC055_create_throwsWhenCreatorNotFound', async () => {
+            creators.findById.mockResolvedValue(undefined);
+
+            const request = makeRequest({
+                archiveId: undefined,
+                archiveCreatorId: 999,
+                newArchive: { referenceCode: 'SE/NY', name: 'Nytt arkiv' },
+            });
+
+            await expect(service.create(request)).rejects.toThrow(NotFoundError);
+            await expect(service.create(request)).rejects.toThrow('Archive creator not found.');
+            expect(archives.create).not.toHaveBeenCalled();
+            expect(structures.create).not.toHaveBeenCalled();
+
+
+        });
+
+
+        /*
+         Verifies that a new archive without any creator (no id and no new one) is rejected.
+         */
+
+        test('_TC056_create_rejectsNewArchiveWithoutCreator', async () => {
+            const request = makeRequest({
+                archiveId: undefined,
+                newArchive: { referenceCode: 'SE/NY', name: 'Nytt arkiv' },
+            });
+
+            await expect(service.create(request)).rejects.toThrow(
+                'A new archive requires an existing or a new archive creator.',
+            );
+
+            expect(creators.create).not.toHaveBeenCalled();
+            expect(archives.create).not.toHaveBeenCalled();
+
+        });
+
+
+        /*
+         Verifies that the optional fields of a new creator are saved when they are sent
+         (endYear and description), and that a startYear that is left out becomes null.
+         */
+        test('_TC057_create_keepsOptionalCreatorFields', async() => {
+            const request = makeRequest({
+                archiveId: undefined,
+                newArchiveCreator: { name: 'Ny bildare', endYear: 2020, description: 'Nedlagd' },
+                newArchive: { referenceCode: 'SE/NY', name: 'Nytt arkiv' },
+            });
+
+            await service.create(request);
+
+            expect(creators.create).toHaveBeenCalledWith(
+                expect.objectContaining({ startYear: null, endYear: 2020, description: 'Nedlagd' }),
+            );
+
+        });
+
+    });
+
+
+
+    describe('create - other request checks', () =>{
+        /*
+         Verifies that a blank name is a ValidationError, same as the code,
+         and nothing else happens.
+         */
+
+        test('_TC058_create_rejectsBlankName', async () => {
+            const request =makeRequest({structure: { code: 'KLA-1',name: '  ', structure_type: 'klassificering' } });
+
+            await expect(service.create(request)).rejects.toThrow('Structure name is required.');
+            expect(structures.findByCode).not.toHaveBeenCalled();
+            expect(knex.transaction).not.toHaveBeenCalled();
+
+        });
+
+
+
+        /*
+         Verifies that sending both archiveId and newArchive is not allowed, the client
+         has to pick one. The archive is not looked up and nothing is created.
+         */
+        test('_TC059_create_rejectsArchiveIdTogetherWithNewArchive', async () => {
+            const request = makeRequest({ newArchive: {referenceCode: 'SE/NY', name: 'Nytt arkiv' }});
+
+            await expect(service.create(request)).rejects.toThrow('Provide either archiveId or newArchive, not both.');
+
+            expect(archives.findById).not.toHaveBeenCalled();
+            expect(structures.create).not.toHaveBeenCalled();
+        });
+
+
+        /*
+         Verifies that a request with neither archiveId nor newArchive is rejected,
+         a structure always has to belong to an archive.
+         */
+        test('_TC060_create_rejectsRequestWithoutAnyArchive', async() => {
+            const request = makeRequest({ archiveId: undefined });
+
+            await expect(service.create(request)).rejects.toThrow('Provide archiveId or newArchive.');
+            expect(structures.create).not.toHaveBeenCalled();
+
+        });
+
+
+        /*
+         Verifies that a request where code and name are missing completely (not just blank)
+         is handled the same way and doesn't crash on the trim.
+         */
+        test('_TC061_create_rejectsMissingCode', async () =>{
+            const request = makeRequest({
+                structure: { structure_type: 'klassificering' } as unknown as CreateStructureRequest['structure'],
+            });
+
+            await expect(service.create(request)).rejects.toThrow('Structure code is required.');
+        });
+
+
+        /*
+         Verifies that the optional structure fields the client does send are saved as they
+         are, and that the language from the request wins over the 'swe' default.
+         */
+        test('_TC062_create_keepsOptionalStructureFields', async () => {
+            const validFrom = new Date('2026-01-01');
+            const validTo = new Date('2030-12-31');
+            const request =makeRequest({
+                structure: {
+                    code: 'KLA-2',
+                    name: 'Med allt',
+                    structure_type: 'klassificering',
+                    description:'En beskrivning',
+                    validFrom,
+                    validTo,
+                    agencyCode: 'SE2120000000',
+                    agencyName: 'Myndigheten',
+                    languageCode: 'eng',
+                    license: 'CC0',
+                    version: '2',
+                    externalId: 'ext-1',
+
+                },
+
+            });
+
+            await service.create(request);
+            expect(structures.create).toHaveBeenCalledWith(expect.objectContaining({
+                description: 'En beskrivning',
+                validFrom,
+                validTo,
+                agencyCode: 'SE2120000000',
+                agencyName: 'Myndigheten',
+                languageCode: 'eng',
+                license: 'CC0',
+                version: '2',
+                externalId: 'ext-1',
+            }));
+        });
+
 
     });
 
