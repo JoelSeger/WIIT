@@ -176,10 +176,10 @@ export class NodeRepository extends CrudRepository<Node> {
           throw new Error(`Node with id: ${nodeId} does not exist`)
       }
 
-      const nextStatus = !node.is_published;
-      node.is_published = nextStatus;
+      const nextStatus = !node.isPublished;
+      node.isPublished = nextStatus;
 
-      await this.qb.where("id", nodeId).update({ is_published: nextStatus });
+      await this.qb.where("id", nodeId).update({ isPublished: nextStatus });
       return node;
   }
 }
