@@ -1,9 +1,5 @@
 import type { Knex } from "knex";
-import { NodeRepository } from "../repos/nodeRepository";
-import { NodeTypeRepository } from "../repos/nodeTypeRepository";
-import { PropertyDefinitionRepository } from "../repos/propertyDefinitionRepository";
-import { NodePropertyRepository } from "../repos/nodePropertyRepository";
-import { StructureRepository } from "../repos/structureRepository";
+import { createRepositories, type Repositories } from "../repos/repositories";
 import type { PropertyDefinition } from "../models/property/propertyDefinition";
 import type { NodePropertyValues } from "../models/node/nodePropertyValues";
 import type { Node } from "../models/node/node";
@@ -30,23 +26,32 @@ interface StoredValue {
 
 const EMPTY: StoredValue = { valueText: null, valueNumber: null, valueDate: null, valueBoolean: null };
 
+/** The repositories this service uses. A test only has to fake these. */
+export type NodePropertyRepos = Pick<
+  Repositories,
+  "nodes" | "nodeTypes" | "structures" | "propertyDefinitions" | "nodeProperties"
+>;
+
 export class NodePropertyService {
-  constructor(private readonly knex: Knex) {}
+  constructor(
+    private readonly knex: Knex,
+    private readonly repos: NodePropertyRepos = createRepositories(knex),
+  ) {}
 
   // ---------------------------------------------------------------------------
   // Read: the form of one node = its fields (for its node type) + the current values
   // ---------------------------------------------------------------------------
 
   async getForm(nodeId: number): Promise<NodeForm> {
-    const node = await new NodeRepository(this.knex).findById(nodeId);
+    const node = await this.repos.nodes().findById(nodeId);
     if (!node) throw new NotFoundError(`Node ${nodeId} was not found`);
 
-    const nodeType = await new NodeTypeRepository(this.knex).findOne(node.nodeTypeId);
-    const structure = await new StructureRepository(this.knex).findById(node.structureId);
-    const defRepo = new PropertyDefinitionRepository(this.knex);
+    const nodeType = await this.repos.nodeTypes().findOne(node.nodeTypeId);
+    const structure = await this.repos.structures().findById(node.structureId);
+    const defRepo = this.repos.propertyDefinitions();
     const defs = await defRepo.findActiveByNodeType(node.nodeTypeId);
     const options = await defRepo.findActiveOptions(defs.filter((d) => d.dataType === "enum").map((d) => d.id));
-    const stored = await new NodePropertyRepository(this.knex).findByNodeId(nodeId);
+    const stored = await this.repos.nodeProperties().findByNodeId(nodeId);
 
     const byTab = new Map<TabKey, FormField[]>();
     for (const def of defs) {
@@ -109,9 +114,9 @@ export class NodePropertyService {
     const result: Record<string, FormFieldValue[]> = {};
     if (keys.length === 0) return result;
 
-    const defs = (await new PropertyDefinitionRepository(this.knex, trx).findActiveByNodeType(node.nodeTypeId))
+    const defs = (await this.repos.propertyDefinitions(trx).findActiveByNodeType(node.nodeTypeId))
       .filter((d) => keys.includes(d.key));
-    const stored = await new NodePropertyRepository(this.knex, trx).findByNodeId(node.id);
+    const stored = await this.repos.nodeProperties(trx).findByNodeId(node.id);
 
     for (const def of defs) {
       result[def.key] = stored
@@ -124,7 +129,7 @@ export class NodePropertyService {
   /** Saves some fields of an existing node (e.g. everything on one tab). */
   async saveValues(nodeId: number, inputs: PropertyValueInput[], userId?: number | null): Promise<NodeForm> {
     await this.knex.transaction(async (trx) => {
-      const node = await new NodeRepository(this.knex, trx).findById(nodeId);
+      const node = await this.repos.nodes(trx).findById(nodeId);
       if (!node) throw new NotFoundError(`Node ${nodeId} was not found`);
       await this.saveValuesInTransaction(trx, node, inputs, userId, false);
     });
@@ -146,7 +151,7 @@ export class NodePropertyService {
     requireAll: boolean,
   ): Promise<void> {
     const list = inputs ?? [];
-    const defRepo = new PropertyDefinitionRepository(this.knex, trx);
+    const defRepo = this.repos.propertyDefinitions(trx);
     const defs = await defRepo.findActiveByNodeType(node.nodeTypeId);
     if (list.length === 0 && !(requireAll && defs.some((d) => d.isRequired))) return;
 
@@ -220,7 +225,7 @@ export class NodePropertyService {
 
     // 3. replace the stored values of exactly the fields that were sent
     const ids = [...byKey.keys()].map((k) => defsByKey.get(k)!.id);
-    await new NodePropertyRepository(this.knex, trx).replaceValues(node.id, ids, rows);
+    await this.repos.nodeProperties(trx).replaceValues(node.id, ids, rows);
   }
 
   // ---------------------------------------------------------------------------
