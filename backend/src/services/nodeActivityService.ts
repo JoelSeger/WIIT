@@ -5,10 +5,15 @@ import { NodeActivityRepository } from "../repos/nodeActivityRepository";
 import type { ActivityDto, ActivityInput } from "../types/node.properties.types";
 import { NotFoundError, ValidationError } from "./errorService";
 
-/** Node types that have the Aktiviteter tab. */
-const TYPES_WITH_ACTIVITIES = ["process"];
+/*
+ * Which node types have the Aktiviteter tab is data: node_types.has_activities (migration 012).
+ *
+ * The two codes below are what an activity IS in Klara, not rules an archivist changes:
+ * an activity ticks handlingstyper and may refer to a strukturenhet. They stay as constants
+ * until fields and tabs become data (F3.7/F3.8).
+ */
 
-/** The checklist of an activity: handlingstyper that belong to this process (via its handlingsslag). */
+/** The checklist of an activity: handlingstyper somewhere below this node. */
 const CHECKLIST_NODE_TYPE = "handlingstyp";
 
 /** "Hänvisning till strukturenhet" must point at a node of this type. */
@@ -39,27 +44,29 @@ export class NodeActivityService {
   /** Replaces the whole activity list of a node. The order of the array becomes the sort order. */
   async replace(nodeId: number, inputs: ActivityInput[]): Promise<ActivityDto[]> {
     await this.knex.transaction(async (trx) => {
-      const node = await new NodeRepository(this.knex, trx).findById(nodeId);
+      const nodes = new NodeRepository(this.knex, trx);
+      const node = await nodes.findById(nodeId);
       if (!node) throw new NotFoundError(`Node ${nodeId} was not found`);
 
       const nodeType = await new NodeTypeRepository(this.knex, trx).findOne(node.nodeTypeId);
-      if (!nodeType || !TYPES_WITH_ACTIVITIES.includes(nodeType.code)) {
+      if (!nodeType || !nodeType.hasActivities) {
         throw new ValidationError("This node type has no activities");
       }
 
-      // Every ticked handlingstyp must be a handlingstyp two levels below this process.
+      // Every ticked node must be a handlingstyp somewhere below this node. The depth is not
+      // fixed: it works with a handlingsslag level in between (process - HS - HT) and without
+      // one (process - HT), so the tree can change shape without this check breaking.
       const wanted = [...new Set(inputs.flatMap((a) => a.handlingstypNodeIds ?? []))];
       if (wanted.length > 0) {
-        const found = await trx("nodes as n")
+        const ofRightType: { id: number }[] = await trx("nodes as n")
           .join("node_types as t", "t.id", "n.node_type_id")
-          .join("nodes as hs", "hs.id", "n.parent_id")
-          .where("hs.parent_id", nodeId)
           .where("t.code", CHECKLIST_NODE_TYPE)
           .whereIn("n.id", wanted)
           .select("n.id");
-        if (found.length !== wanted.length) {
+        const below = await nodes.filterDescendantsOf(nodeId, ofRightType.map((r) => r.id));
+        if (below.size !== wanted.length) {
           throw new ValidationError(
-            `The checklist may only contain ${CHECKLIST_NODE_TYPE} nodes that belong to this process`,
+            `The checklist may only contain ${CHECKLIST_NODE_TYPE} nodes that belong to this node`,
           );
         }
       }
