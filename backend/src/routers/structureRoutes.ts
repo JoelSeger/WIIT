@@ -2,6 +2,8 @@ import { Router } from "express";
 import type { Knex } from "knex";
 import { hasRole } from "../middleware/auth";
 import { StructureRepository } from "../repos/structureRepository";
+import { StructureController } from "../controllers/structureController";
+import { StructureEditService } from "../services/structureEditService";
 
 /**
  * GET /api/structures  - all structures (id, code, name, type …)
@@ -12,8 +14,10 @@ import { StructureRepository } from "../repos/structureRepository";
  */
 export function createStructureRouter(db: Knex): Router {
   const router = Router();
-  const structures = new StructureRepository(db);
+    const structures = new StructureRepository(db);
+    const controller = new StructureController(new StructureEditService(db));
 
+    //This should call a service not a repo directly.
   router.get("/", async (req, res, next) => {
     try {
       const type = typeof req.query.type === "string" ? req.query.type : undefined;
@@ -25,5 +29,6 @@ export function createStructureRouter(db: Knex): Router {
     }
   });
 
+    router.put("/publish",)
   return router;
 }
