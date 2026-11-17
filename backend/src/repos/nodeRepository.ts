@@ -185,6 +185,15 @@ export class NodeRepository extends CrudRepository<Node> {
   }
 
   async flipPublishedByStructure(structureId: number, nextStatus: boolean): Promise<Node[]> {
+
+    await this.qb.where({ structureId: structureId }).update({ isPublished: nextStatus });
+
     const nodes = await this.qb.where({ structureId: structureId }).select();
+
+    if (!nodes || nodes.length == 0) {
+      return [];
+    }
+
+    return nodes
   }
 }
