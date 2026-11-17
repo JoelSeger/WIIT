@@ -4,8 +4,8 @@ import { CrudRepository } from "./crudRepository";
 
 
 export class ChangeLogRepository extends CrudRepository<ChangeLog>{
-    constructor(protected readonly db: Knex) {
-    super(db, "change_log");
+    constructor(protected readonly db: Knex, trx?: Knex.Transaction) {
+    super(db, "change_log", trx);
 }
 
   async record(entry: Partial<ChangeLog>): Promise<void> {
