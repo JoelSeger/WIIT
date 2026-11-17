@@ -1,6 +1,6 @@
 import type { Knex } from "knex";
-import { NodeRepository } from "../repos/nodeRepository";
-import { ChangeLogRepository } from "../repos/changeLogRepository";
+import type { NodeRepository } from "../repos/nodeRepository";
+import { createRepositories, type Repositories } from "../repos/repositories";
 import { NodePropertyService } from "./nodePropertyService";
 import { ConflictError, NotFoundError, ValidationError } from "./errorService";
 import type { Node } from "../models/node/node";
@@ -8,6 +8,7 @@ import type { NodeForm } from "../types/node.properties.types";
 import type { EditNodeRequest, NodeAttributeChanges } from "../types/nodeEdit.types";
 
 import { ChangeLog } from "../models/changeLog";
+import { ChangeLogRepository } from "../repos/changeLogRepository";
 
 /** What is written to change_log: only the things that really changed, old and new. */
 type Snapshot = Record<string, unknown>;
@@ -25,16 +26,22 @@ type Snapshot = Record<string, unknown>;
  * What an edit can NOT change: the node type, the structure, the parent and the sort order
  * (moving a node is a separate function) and is_published (publishing is a separate function).
  */
-export class NodeEditService {
-    private readonly properties: NodePropertyService;
 
-  constructor(private readonly knex: Knex) {
-      this.properties = new NodePropertyService(knex);
-  }
+export type NodeEditRepos = Pick<Repositories, "nodes" | "changeLog">;
+
+/** Only what this service calls on NodePropertyService – easy to fake in a test. */
+export type NodeEditProperties = Pick<NodePropertyService, "snapshotValues" | "saveValuesInTransaction" | "getForm">;
+
+export class NodeEditService {
+  constructor(
+    private readonly knex: Knex,
+    private readonly repos: NodeEditRepos = createRepositories(knex),
+    private readonly properties: NodeEditProperties = new NodePropertyService(knex),
+  ) {}
 
   async editNode(request: EditNodeRequest): Promise<NodeForm> {
     await this.knex.transaction(async (trx) => {
-      const nodes = new NodeRepository(this.knex, trx);
+      const nodes = this.repos.nodes(trx);
       const node = await nodes.findById(request.nodeId);
       if (!node) throw new NotFoundError(`Node ${request.nodeId} was not found`);
 
@@ -133,7 +140,7 @@ export class NodeEditService {
   }
 
   async publishUnpublishNode(nodeId: number, userId: number) {
-      const node = new NodeRepository(this.knex);
+      const node = this.repos.nodes()
       const change = new ChangeLogRepository(this.knex);
       const newNode = await node.flipPublished(nodeId);
       const changeLog: Omit<ChangeLog, "id" | "changedAt"> = {
