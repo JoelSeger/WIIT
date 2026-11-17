@@ -24,4 +24,22 @@ export class StructureRepository extends CrudRepository<Structure> {
     if (publicOnly) q.where({ isPublished: true });
     return q;
   }
+
+  async flipPublished(id: number): Promise<Structure> {
+    const structure = await this.qb
+      .where("id", id)
+      .select()
+      .first();
+
+    if (!structure) throw new Error(`Structure with id: ${id} was not found`);
+
+    const nextStatus = !structure.isPublished;
+    structure.isPublished = nextStatus;
+
+    await this.qb
+      .where("id", id)
+      .update({ isPublished: nextStatus });
+
+    return structure;
+  }
 }

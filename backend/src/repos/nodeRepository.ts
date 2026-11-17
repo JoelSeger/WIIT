@@ -4,6 +4,7 @@ import type { Node } from "../models/node/node";
 import type { NodePropertyValues } from "../models/node/nodePropertyValues";
 import type { CreateNodeData } from "../types/nodeCreation.types";
 import type { NodeAttributeChanges } from "../types/nodeEdit.types";
+import { Structure } from "../models/structure/structure";
 
 export class NodeRepository extends CrudRepository<Node> {
   constructor(knex: Knex, trx?: Knex.Transaction) {
@@ -181,5 +182,9 @@ export class NodeRepository extends CrudRepository<Node> {
 
       await this.qb.where("id", nodeId).update({ isPublished: nextStatus });
       return node;
+  }
+
+  async flipPublishedByStructure(structureId: number, nextStatus: boolean): Promise<Node[]> {
+    const nodes = await this.qb.where({ structureId: structureId }).select();
   }
 }
