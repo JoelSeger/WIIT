@@ -1,7 +1,5 @@
 import type { Knex } from "knex";
-import { NodeRepository } from "../repos/nodeRepository";
-import { NodeTypeRepository } from "../repos/nodeTypeRepository";
-import { StructureRepository } from "../repos/structureRepository";
+import { createRepositories, type Repositories } from "../repos/repositories";
 import type { Node } from "../models/node/node";
 import type { PropertyValueInput } from "../types/node.properties.types";
 import { NodePropertyService } from "./nodePropertyService";
@@ -23,16 +21,25 @@ export interface CreateNodeRequest {
   createdBy: number | null;
 }
 
+export type NodeCreationRepos = Pick<Repositories, "nodes" | "nodeTypes" | "structures">;
+
+/** Only what this service calls on NodePropertyService – easy to fake in a test. */
+export type NodeCreationProperties = Pick<NodePropertyService, "saveValuesInTransaction">;
+
 export class NodeCreationService {
-  constructor(private readonly knex: Knex) {}
+  constructor(
+    private readonly knex: Knex,
+    private readonly repos: NodeCreationRepos = createRepositories(knex),
+    private readonly properties: NodeCreationProperties = new NodePropertyService(knex),
+  ) {}
 
   async createNode(data: CreateNodeRequest): Promise<Node> {
     return this.knex.transaction(async (trx) => {
-      const structure = await new StructureRepository(this.knex, trx).findById(data.structureId);
+      const structure = await this.repos.structures(trx).findById(data.structureId);
       if (!structure) throw new NotFoundError(`Structure ${data.structureId} was not found`);
 
-      const nodeTypeRepository = new NodeTypeRepository(this.knex, trx);
-      const nodeRepository = new NodeRepository(this.knex, trx);
+      const nodeTypeRepository = this.repos.nodeTypes(trx);
+      const nodeRepository = this.repos.nodes(trx);
 
       const childType = await nodeTypeRepository.findByCode(data.nodeTypeCode);
       if (!childType) {
@@ -95,7 +102,7 @@ export class NodeCreationService {
       });
 
       // Attribute values in the same transaction: an invalid value means no node either.
-      await new NodePropertyService(this.knex).saveValuesInTransaction(
+      await this.properties.saveValuesInTransaction(
         trx,
         node,
         data.properties,

@@ -1,7 +1,5 @@
 import type { Knex } from "knex";
-import { NodeRepository } from "../repos/nodeRepository";
-import { NodeTypeRepository } from "../repos/nodeTypeRepository";
-import { NodeActivityRepository } from "../repos/nodeActivityRepository";
+import { createRepositories, type Repositories } from "../repos/repositories";
 import type { ActivityDto, ActivityInput } from "../types/node.properties.types";
 import { NotFoundError, ValidationError } from "./errorService";
 
@@ -19,14 +17,19 @@ const CHECKLIST_NODE_TYPE = "handlingstyp";
 /** "Hänvisning till strukturenhet" must point at a node of this type. */
 const STRUCTURE_UNIT_NODE_TYPE = "strukturenhet";
 
+export type NodeActivityRepos = Pick<Repositories, "nodes" | "nodeTypes" | "nodeActivities">;
+
 export class NodeActivityService {
-  constructor(private readonly knex: Knex) {}
+  constructor(
+    private readonly knex: Knex,
+    private readonly repos: NodeActivityRepos = createRepositories(knex),
+  ) {}
 
   async list(nodeId: number): Promise<ActivityDto[]> {
-    const node = await new NodeRepository(this.knex).findById(nodeId);
+    const node = await this.repos.nodes().findById(nodeId);
     if (!node) throw new NotFoundError(`Node ${nodeId} was not found`);
 
-    const repo = new NodeActivityRepository(this.knex);
+    const repo = this.repos.nodeActivities();
     const activities = await repo.findByNodeId(nodeId);
     const checklist = await repo.findHandlingstypIds(activities.map((a) => a.id));
 
@@ -44,11 +47,11 @@ export class NodeActivityService {
   /** Replaces the whole activity list of a node. The order of the array becomes the sort order. */
   async replace(nodeId: number, inputs: ActivityInput[]): Promise<ActivityDto[]> {
     await this.knex.transaction(async (trx) => {
-      const nodes = new NodeRepository(this.knex, trx);
+      const nodes = this.repos.nodes(trx);
       const node = await nodes.findById(nodeId);
       if (!node) throw new NotFoundError(`Node ${nodeId} was not found`);
 
-      const nodeType = await new NodeTypeRepository(this.knex, trx).findOne(node.nodeTypeId);
+      const nodeType = await this.repos.nodeTypes(trx).findOne(node.nodeTypeId);
       if (!nodeType || !nodeType.hasActivities) {
         throw new ValidationError("This node type has no activities");
       }
@@ -84,7 +87,7 @@ export class NodeActivityService {
         }
       }
 
-      const repo = new NodeActivityRepository(this.knex, trx);
+      const repo = this.repos.nodeActivities(trx);
       await repo.deleteByNodeId(nodeId);
 
       for (const [index, input] of inputs.entries()) {

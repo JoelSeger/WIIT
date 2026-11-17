@@ -1,8 +1,5 @@
 import type { Knex } from "knex";
-import { NodeRepository } from "../repos/nodeRepository";
-import { NodeActivityRepository } from "../repos/nodeActivityRepository";
-import { NodeRelationRepository } from "../repos/nodeRelationRepository";
-import { ChangeLogRepository } from "../repos/changeLogRepository";
+import { createRepositories, type Repositories } from "../repos/repositories";
 import { ConflictError, NotFoundError, isForeignKeyViolation } from "./errorService";
 import type { DeleteNodeRequest, DeletedNode } from "../types/nodeDelete.types";
 
@@ -18,13 +15,18 @@ import type { DeleteNodeRequest, DeletedNode } from "../types/nodeDelete.types";
  *   6. a change_log row (action 'delete') keeps what was removed
  * If any step fails, nothing is deleted.
  */
+export type NodeDeleteRepos = Pick<Repositories, "nodes" | "nodeActivities" | "nodeRelations" | "changeLog">;
+
 export class NodeDeleteService {
-  constructor(private readonly knex: Knex) {}
+  constructor(
+    private readonly knex: Knex,
+    private readonly repos: NodeDeleteRepos = createRepositories(knex),
+  ) {}
 
   async deleteNode(request: DeleteNodeRequest): Promise<DeletedNode> {
     try {
       return await this.knex.transaction(async (trx) => {
-        const nodes = new NodeRepository(this.knex, trx);
+        const nodes = this.repos.nodes(trx);
         const node = await nodes.findById(request.nodeId);
         if (!node) throw new NotFoundError(`Node ${request.nodeId} was not found`);
 
@@ -32,10 +34,10 @@ export class NodeDeleteService {
           throw new ConflictError("The node has children and cannot be deleted. Delete or move the children first");
         }
 
-        await new NodeActivityRepository(this.knex, trx).deleteByNodeId(node.id);
-        const relations = await new NodeRelationRepository(this.knex, trx).deleteByNodeId(node.id);
+        await this.repos.nodeActivities(trx).deleteByNodeId(node.id);
+        const relations = await this.repos.nodeRelations(trx).deleteByNodeId(node.id);
 
-        if (await new NodeActivityRepository(this.knex, trx).isReferenced(node.id)) {
+        if (await this.repos.nodeActivities(trx).isReferenced(node.id)) {
           throw new ConflictError(
             "The node is used by an activity (as strukturenhet or handlingstyp) and cannot be deleted",
           );
@@ -44,7 +46,7 @@ export class NodeDeleteService {
         const deleted = await nodes.delete(node.id);
         if (!deleted) throw new NotFoundError(`Node ${request.nodeId} was not found`);
 
-        await new ChangeLogRepository(this.knex, trx).logNodeDelete({
+        await this.repos.changeLog(trx).logNodeDelete({
           nodeId: node.id,
           structureId: node.structureId,
           oldValue: {

@@ -1,10 +1,7 @@
 
 import type { Knex } from "knex";
 
-import { ArchiveCreatorRepository } from "../repos/archiveCreatorRepository";
-import { ArchiveRepository } from "../repos/archiveRepository";
-import { StructureRepository } from "../repos/structureRepository";
-import { ArchiveStructureRepository } from "../repos/archiveStructureRepository";
+import { createRepositories, type Repositories } from "../repos/repositories";
 
 import type { ArchiveCreator } from "../models/archive/archiveCreator";
 import type { Archive } from "../models/archive/archive";
@@ -21,8 +18,16 @@ export interface CreateStructureResult {
   structure: Structure;
 }
 
+export type StructureCreationRepos = Pick<
+  Repositories,
+  "structures" | "archives" | "archiveCreators" | "archiveStructures"
+>;
+
 export class StructureCreationService {
-  constructor(private readonly knex: Knex) {}
+  constructor(
+    private readonly knex: Knex,
+    private readonly repos: StructureCreationRepos = createRepositories(knex),
+  ) {}
 
   async create(
     request: CreateStructureRequest,
@@ -32,22 +37,15 @@ export class StructureCreationService {
     if (!code) throw new ValidationError("Structure code is required.");
     if (!name) throw new ValidationError("Structure name is required.");
 
-    if (await new StructureRepository(this.knex).findByCode(code)) {
+    if (await this.repos.structures().findByCode(code)) {
       throw new ConflictError(`A structure with code '${code}' already exists.`);
     }
 
     return this.knex.transaction(async (trx) => {
-      const creatorRepository =
-        new ArchiveCreatorRepository(this.knex, trx);
-
-      const archiveRepository =
-        new ArchiveRepository(this.knex, trx);
-
-      const structureRepository =
-        new StructureRepository(this.knex, trx);
-
-      const archiveStructureRepository =
-        new ArchiveStructureRepository(this.knex, trx);
+      const creatorRepository = this.repos.archiveCreators(trx);
+      const archiveRepository = this.repos.archives(trx);
+      const structureRepository = this.repos.structures(trx);
+      const archiveStructureRepository = this.repos.archiveStructures(trx);
 
       let createdCreator: ArchiveCreator | undefined;
       let archive: Archive;
