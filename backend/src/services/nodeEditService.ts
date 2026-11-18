@@ -77,7 +77,7 @@ export class NodeEditService {
         const nodeType = await this.repos.nodeTypes().findOne(node.id);
         if (!nodeType) throw new NotFoundError(`NodeType with id: ${node.id} was not found`);
         await this.repos.changeLog().record({
-            entityType: nodeType.name,
+            entityType: "node",
             entityId: node.id,
             structureId: node.structureId,
             action: "update",

@@ -49,6 +49,7 @@ export class NodeDeleteService {
 
         await this.repos.changeLog().record({
           entityId: node.id,
+          entityType: "node",
           structureId: node.structureId,
           action: "delete",
           oldValue: JSON.stringify({
@@ -70,6 +71,7 @@ export class NodeDeleteService {
             })),
           }),
           newValue: null,
+          comment: null,
           changedBy: request.deletedBy,
           changedAt: new Date(),
         });
