@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type { Knex } from "knex";
-import { hasRole } from "../middleware/auth";
+import { hasRole, requireRole } from "../middleware/auth";
 import { StructureRepository } from "../repos/structureRepository";
 import { StructureController } from "../controllers/structureController";
 import { StructureEditService } from "../services/structureEditService";
@@ -29,6 +29,7 @@ export function createStructureRouter(db: Knex): Router {
     }
   });
 
-    router.put("/publish", controller.flipPublished);
+  router.put("/publish", controller.flipPublished, requireRole("editor"));
+
   return router;
 }
