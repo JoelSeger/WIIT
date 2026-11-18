@@ -28,6 +28,44 @@ export class NodeRepository extends CrudRepository<Node> {
       .select("v.*");
   }
 
+  /**
+   * Which of `nodeIds` lie somewhere below `ancestorId` (child, grandchild, any depth).
+   *
+   * Walks up the parent_id chain of all nodes at the same time: one query per level of the
+   * tree, not one per node. Plain WHERE IN queries, so it is the same SQL on SQL Server and
+   * SQLite (a recursive CTE is written differently on the two).
+   *
+   * The node itself does not count as its own descendant.
+   * Also what moving a node (F3.5) needs for F6.1.1: the new parent must not be in this set.
+   */
+  async filterDescendantsOf(ancestorId: number, nodeIds: number[]): Promise<Set<number>> {
+    const db = this.trx ?? this.knex;
+    const found = new Set<number>();
+    // nodeId -> the ancestor of it we have climbed to so far (starts at the node itself)
+    let climbing = new Map<number, number>([...new Set(nodeIds)].map((id) => [id, id]));
+
+    // A tree deeper than 100 does not exist, at least in our app; the limit only stops a loop in broken data.
+    for (let level = 0; level < 100 && climbing.size > 0; level++) {
+      const current = [...new Set(climbing.values())];
+      const parentOf = new Map<number, number | null>();
+      for (let i = 0; i < current.length; i += 500) {   // MSSQL allows at most 2100 parameters
+        const rows: { id: number; parent: number | null }[] = await db("nodes")
+          .whereIn("id", current.slice(i, i + 500))
+          .select({ id: "id", parent: "parent_id" });
+        for (const r of rows) parentOf.set(r.id, r.parent);
+      }
+
+      const next = new Map<number, number>();
+      for (const [nodeId, at] of climbing) {
+        const parent = parentOf.get(at);
+        if (parent === ancestorId) found.add(nodeId);
+        else if (parent != null) next.set(nodeId, parent);
+      }
+      climbing = next;
+    }
+    return found;
+  }
+
   // ---------- from my branch (used by createNode) ----------
 
   async findById(id: number): Promise<Node | undefined> {

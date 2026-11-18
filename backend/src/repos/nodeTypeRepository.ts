@@ -7,7 +7,6 @@ export class NodeTypeRepository extends CrudRepository<NodeType> {
     super(knex, "node_types", trx);
   }
 
-  // From develop
   async findByIds(ids: number[]): Promise<NodeType[]> {
     if (ids.length === 0) return [];
     return this.qb.whereIn("id", ids);
@@ -31,10 +30,11 @@ export class NodeTypeRepository extends CrudRepository<NodeType> {
       eadUnitDescription: row.eadUnitDescription,
       description: row.description,
       isActive: row.isActive,
+      canBeRoot: row.canBeRoot,
+      hasActivities: row.hasActivities,
     };
   }
 
-  // From lilas's branch
   async isAllowedChild(parentTypeId: number, childTypeId: number): Promise<boolean> {
     const db = this.trx ?? this.knex;
 

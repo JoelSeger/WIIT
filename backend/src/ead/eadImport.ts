@@ -272,6 +272,8 @@ export async function importEad(knex: Knex, input: ImportInput): Promise<ImportR
     const createdTypeIds = new Set<number>();
     /** "parentTypeId|childTypeId" for every parent/child pair in the file, see node_type_rules below. */
     const typePairs = new Set<string>();
+    /** Types that are a top node somewhere in the file, see can_be_root below. */
+    const rootTypeIds = new Set<number>();
 
     const propertyDefs: PropertyDefRow[] = await trx('property_definitions')
       .select('id', 'node_type_id', 'key', 'label', 'data_type', 'ead_element', 'is_repeatable');
@@ -442,6 +444,7 @@ export async function importEad(knex: Knex, input: ImportInput): Promise<ImportR
         sortOrder: number, usedCodes: Set<string>): Promise<void> => {
         const nodeTypeId = await typeFor(node, tree.structureType);
         if (parentTypeId !== null) typePairs.add(`${parentTypeId}|${nodeTypeId}`);
+        if (parentId === null) rootTypeIds.add(nodeTypeId);
 
         // F6.1: reference_code is unique among siblings (008); a repeat is kept as a field instead
         let referenceCode = node.unitid?.trim() || null;
@@ -598,6 +601,12 @@ export async function importEad(knex: Knex, input: ImportInput): Promise<ImportR
       if (!(await trx('node_type_rules').where(rule).first('parent_type_id'))) {
         await trx('node_type_rules').insert(rule);
       }
+    }
+    // The same for top nodes (migration 012): a type the import created and used as the top
+    // node of a structure may be a root, otherwise no such node could be created by hand.
+    const newRootTypeIds = [...rootTypeIds].filter((id) => createdTypeIds.has(id));
+    if (newRootTypeIds.length) {
+      await trx('node_types').whereIn('id', newRootTypeIds).update({ can_be_root: true });
     }
 
     if (createdNodeTypes.length) {
