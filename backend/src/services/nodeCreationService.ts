@@ -21,15 +21,6 @@ export interface CreateNodeRequest {
   createdBy: number | null;
 }
 
-/**
- * Node types that may be a root (no parent), per structure type.
- * A verksamhetsområde can be a root in a klassificering structure only.
- */
-const ROOT_TYPES: Record<string, string[]> = {
-  klassificering: ["verksamhetsomrade"],
-  forvaring: ["strukturenhet"],
-};
-
 export type NodeCreationRepos = Pick<Repositories, "nodes" | "nodeTypes" | "structures">;
 
 /** Only what this service calls on NodePropertyService – easy to fake in a test. */
@@ -64,8 +55,9 @@ export class NodeCreationService {
       }
 
       if (data.parentId === null) {
-        const allowedRoots = ROOT_TYPES[structure.structureType] ?? [];
-        if (!allowedRoots.includes(childType.code)) {
+        // Which types may be a top node is data: node_types.can_be_root (migration 012).
+        // In which kind of structure was checked above (the type's own structure_type).
+        if (!childType.canBeRoot) {
           throw new ValidationError(
             `Node type '${data.nodeTypeCode}' is not allowed as a root node in a ${structure.structureType} structure`,
           );
