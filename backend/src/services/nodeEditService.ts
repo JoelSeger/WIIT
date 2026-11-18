@@ -75,7 +75,7 @@ export class NodeEditService {
         const nodeType = await this.repos.nodeTypes().findOne(node.id);
         if (!nodeType) throw new NotFoundError(`NodeType with id: ${node.id} was not found`);
         // --- 4. traceability -----------------------------------------------------------------
-        await new ChangeLogRepository(this.knex).record({
+        await this.repos.changeLog().record({
             entityType: nodeType.name,
             entityId: node.id,
             structureId: node.structureId,

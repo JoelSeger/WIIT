@@ -47,7 +47,7 @@ export class NodeDeleteService {
         const deleted = await nodes.delete(node.id);
         if (!deleted) throw new NotFoundError(`Node ${request.nodeId} was not found`);
 
-        await new ChangeLogRepository(this.knex).record({
+        await this.repos.changeLog().record({
           entityId: node.id,
           structureId: node.structureId,
           action: "delete",
