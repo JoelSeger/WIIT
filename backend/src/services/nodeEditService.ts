@@ -27,7 +27,7 @@ type Snapshot = Record<string, unknown>;
  * (moving a node is a separate function) and is_published (publishing is a separate function).
  */
 
-export type NodeEditRepos = Pick<Repositories, "nodes" | "changeLog">;
+export type NodeEditRepos = Pick<Repositories, "nodes" | "changeLog" | "nodeTypes">;
 
 /** Only what this service calls on NodePropertyService – easy to fake in a test. */
 export type NodeEditProperties = Pick<NodePropertyService, "snapshotValues" | "saveValuesInTransaction" | "getForm">;
@@ -71,15 +71,21 @@ export class NodeEditService {
         // Throwing rolls back the property values saved above as well.
         throw new ConflictError("The node was changed by someone else. Reload it and try again");
       }
-
-      // --- 4. traceability -----------------------------------------------------------------
-      await new ChangeLogRepository(this.knex).record({
-        entityId: node.id,
-        structureId: node.structureId,
-        oldValue: JSON.stringify(oldValues),
-        newValue: JSON.stringify(newValues),
-        changedBy: request.updatedBy,
-      });
+        //Extract nodetype for changelog
+        const nodeType = await this.repos.nodeTypes().findOne(node.id);
+        if (!nodeType) throw new NotFoundError(`NodeType with id: ${node.id} was not found`);
+        // --- 4. traceability -----------------------------------------------------------------
+        await new ChangeLogRepository(this.knex).record({
+            entityType: nodeType.name,
+            entityId: node.id,
+            structureId: node.structureId,
+            action: "update",
+            oldValue: JSON.stringify(oldValues),
+            newValue: JSON.stringify(newValues),
+            comment: null,
+            changedBy: request.updatedBy,
+            changedAt: new Date(),
+        });
     });
 
     return this.properties.getForm(request.nodeId);

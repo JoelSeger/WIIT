@@ -50,6 +50,7 @@ export class NodeDeleteService {
         await new ChangeLogRepository(this.knex).record({
           entityId: node.id,
           structureId: node.structureId,
+          action: "delete",
           oldValue: JSON.stringify({
             parentId: node.parentId,
             nodeTypeId: node.nodeTypeId,
@@ -67,8 +68,10 @@ export class NodeDeleteService {
               fromNodeId: r.fromNodeId,
               toNodeId: r.toNodeId,
             })),
-            }),
+          }),
+          newValue: null,
           changedBy: request.deletedBy,
+          changedAt: new Date(),
         });
 
         return { id: node.id, structureId: node.structureId, title: node.title };
