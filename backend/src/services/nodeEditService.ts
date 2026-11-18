@@ -73,9 +73,9 @@ export class NodeEditService {
       }
 
         //Extract nodetype for changelog
+        // --- 4. traceability -----------------------------------------------------------------
         const nodeType = await this.repos.nodeTypes().findOne(node.id);
         if (!nodeType) throw new NotFoundError(`NodeType with id: ${node.id} was not found`);
-        // --- 4. traceability -----------------------------------------------------------------
         await this.repos.changeLog().record({
             entityType: nodeType.name,
             entityId: node.id,
@@ -90,6 +90,24 @@ export class NodeEditService {
     });
 
     return this.properties.getForm(request.nodeId);
+  }
+
+  async publishUnpublishNode(nodeId: number, userId: number): Promise<Node> {
+     return await this.knex.transaction(async (trx) => {
+         const newNode = await this.repos.nodes().flipPublished(nodeId);
+          const changeLog: Omit<ChangeLog, "id" | "changedAt"> = {
+            entityType: "node",
+            entityId: newNode.id,
+            structureId: newNode.structureId,
+            action: "update",
+            oldValue: (!newNode.isPublished!).toString(),
+            newValue: newNode.isPublished!.toString(),
+            comment: "Changed the published status",
+            changedBy: userId,
+          }
+         await this.repos.changeLog().record(changeLog);
+         return newNode;
+      })
   }
 
   // ---------------------------------------------------------------------------
@@ -144,26 +162,5 @@ export class NodeEditService {
   private toDateString(d: unknown): string | null {
     if (!d) return null;
     return d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10);
-  }
-
-  async publishUnpublishNode(nodeId: number, userId: number): Promise<Node> {
-      let newNode: Node;
-      await this.knex.transaction(async (trx) => {
-          const node = this.repos.nodes()
-          const change = this.repos.changeLog();
-          newNode = await node.flipPublished(nodeId);
-          const changeLog: Omit<ChangeLog, "id" | "changedAt"> = {
-            entityType: "node",
-            entityId: newNode.id,
-            structureId: newNode.structureId,
-            action: "update",
-            oldValue: (!newNode.isPublished!).toString(),
-            newValue: newNode.isPublished!.toString(),
-            comment: "Changed the published status",
-            changedBy: userId,
-          }
-          await change.record(changeLog);
-      })
-        return newNode!;
   }
 }
