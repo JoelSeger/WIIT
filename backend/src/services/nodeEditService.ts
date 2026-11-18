@@ -73,13 +73,13 @@ export class NodeEditService {
       }
 
       // --- 4. traceability -----------------------------------------------------------------
-      await new ChangeLogRepository(this.knex).record({
-        entityId: node.id,
-        structureId: node.structureId,
-        oldValue: JSON.stringify(oldValues),
-        newValue: JSON.stringify(newValues),
-        changedBy: request.updatedBy,
-      });
+        await this.repos.changeLog(trx).logNodeUpdate({
+            nodeId: node.id,
+            structureId: node.structureId,
+            oldValue: oldValues,
+            newValue: newValues,
+            changedBy: request.updatedBy,
+        });
     });
 
     return this.properties.getForm(request.nodeId);
