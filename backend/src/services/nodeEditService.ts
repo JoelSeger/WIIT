@@ -71,6 +71,7 @@ export class NodeEditService {
         // Throwing rolls back the property values saved above as well.
         throw new ConflictError("The node was changed by someone else. Reload it and try again");
       }
+
         //Extract nodetype for changelog
         const nodeType = await this.repos.nodeTypes().findOne(node.id);
         if (!nodeType) throw new NotFoundError(`NodeType with id: ${node.id} was not found`);
@@ -145,20 +146,24 @@ export class NodeEditService {
     return d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10);
   }
 
-  async publishUnpublishNode(nodeId: number, userId: number) {
-      const node = this.repos.nodes()
-      const change = new ChangeLogRepository(this.knex);
-      const newNode = await node.flipPublished(nodeId);
-      const changeLog: Omit<ChangeLog, "id" | "changedAt"> = {
-        entityType: newNode.title,
-        entityId: newNode.id,
-        structureId: newNode.structureId,
-        action: "Update Publish",
-        oldValue: (!newNode.isPublished!).toString(),
-        newValue: newNode.isPublished!.toString(),
-        comment: "Changed the published status",
-        changedBy: userId,
-      }
-      change.record(changeLog);
+  async publishUnpublishNode(nodeId: number, userId: number): Promise<Node> {
+      let newNode: Node;
+      await this.knex.transaction(async (trx) => {
+          const node = this.repos.nodes()
+          const change = this.repos.changeLog();
+          newNode = await node.flipPublished(nodeId);
+          const changeLog: Omit<ChangeLog, "id" | "changedAt"> = {
+            entityType: "node",
+            entityId: newNode.id,
+            structureId: newNode.structureId,
+            action: "update",
+            oldValue: (!newNode.isPublished!).toString(),
+            newValue: newNode.isPublished!.toString(),
+            comment: "Changed the published status",
+            changedBy: userId,
+          }
+          await change.record(changeLog);
+      })
+        return newNode!;
   }
 }

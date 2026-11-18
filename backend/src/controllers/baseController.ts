@@ -1,6 +1,6 @@
-import type { Response } from 'express';
+import type { Response, Request } from 'express';
 import logger from '../config/logger';
-import { ServiceError, isUniqueViolation } from '../services/errorService';
+import { ServiceError, ValidationError, isUniqueViolation } from '../services/errorService';
 
 /**
  * The base controller all other controllers extend. Every endpoint answers with the same shape:
@@ -48,5 +48,11 @@ export abstract class BaseController {
     }
     logger.error({ err }, "Unhandled error");
     this.error(res, "An unexpected error occurred", 500);
+  }
+
+  protected nodeId(req: Request): number {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) throw new ValidationError("A valid node id is required");
+    return id;
   }
 }
