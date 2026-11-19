@@ -73,7 +73,6 @@ export class NodeDeleteService {
           newValue: null,
           comment: null,
           changedBy: request.deletedBy,
-          changedAt: new Date(),
         });
 
         return { id: node.id, structureId: node.structureId, title: node.title };

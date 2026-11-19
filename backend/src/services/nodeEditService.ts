@@ -76,7 +76,7 @@ export class NodeEditService {
         // --- 4. traceability -----------------------------------------------------------------
         const nodeType = await this.repos.nodeTypes().findOne(node.id);
         if (!nodeType) throw new NotFoundError(`NodeType with id: ${node.id} was not found`);
-        await this.repos.changeLog().record({
+        await this.repos.changeLog(trx).record({
             entityType: "node",
             entityId: node.id,
             structureId: node.structureId,
@@ -85,7 +85,6 @@ export class NodeEditService {
             newValue: JSON.stringify(newValues),
             comment: null,
             changedBy: request.updatedBy,
-            changedAt: new Date(),
         });
     });
 
@@ -94,18 +93,17 @@ export class NodeEditService {
 
   async publishUnpublishNode(nodeId: number, userId: number): Promise<Node> {
      return await this.knex.transaction(async (trx) => {
-         const newNode = await this.repos.nodes().flipPublished(nodeId);
-          const changeLog: Omit<ChangeLog, "id" | "changedAt"> = {
-            entityType: "node",
-            entityId: newNode.id,
-            structureId: newNode.structureId,
-            action: "update",
-            oldValue: (!newNode.isPublished!).toString(),
-            newValue: newNode.isPublished!.toString(),
-            comment: "Changed the published status",
-            changedBy: userId,
-          }
-         await this.repos.changeLog().record(changeLog);
+       const newNode = await this.repos.nodes(trx).flipPublished(nodeId);
+       this.repos.changeLog(trx).record({
+         entityType: "node",
+         entityId: newNode.id,
+         structureId: newNode.structureId,
+         action: "update",
+         oldValue: (!newNode.isPublished!).toString(),
+         newValue: newNode.isPublished!.toString(),
+         comment: "Changed the published status",
+         changedBy: userId,
+       });
          return newNode;
       })
   }

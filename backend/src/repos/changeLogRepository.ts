@@ -8,7 +8,8 @@ export class ChangeLogRepository extends CrudRepository<ChangeLog> {
     super(knex, "change_log", trx);
   }
 
-    async record(entry: Partial<ChangeLog>): Promise<void> {
+  //ID and changedAt should be handled by the database not the program.
+    async record(entry: Omit<ChangeLog, "id" | "changedAt">): Promise<void> {
         await this.qb
             .insert({
                 ...entry
