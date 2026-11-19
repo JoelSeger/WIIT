@@ -140,23 +140,19 @@ export class NodeEditService {
   }
 
   async publishUnpublishNode(nodeId: number, userId: number): Promise<Node> {
-      let newNode: Node;
-      await this.knex.transaction(async (trx) => {
-          const node = this.repos.nodes()
-          const change = this.repos.changeLog();
-          newNode = await node.flipPublished(nodeId);
-          const changeLog: Omit<ChangeLog, "id" | "changedAt"> = {
-            entityType: "node",
-            entityId: newNode.id,
-            structureId: newNode.structureId,
-            action: "update",
-            oldValue: (!newNode.isPublished!).toString(),
-            newValue: newNode.isPublished!.toString(),
-            comment: "Changed the published status",
-            changedBy: userId,
-          }
-          await change.record(changeLog);
+      return await this.knex.transaction(async (trx) => {
+        const newNode = await this.repos.nodes().flipPublished(nodeId);
+        this.repos.changeLog(trx).record({
+          entityType: "node",
+          entityId: newNode.id,
+          structureId: newNode.structureId,
+          action: "update",
+          oldValue: (!newNode.isPublished!).toString(),
+          newValue: newNode.isPublished!.toString(),
+          comment: "Changed the published status",
+          changedBy: userId,
+        });
+        return newNode;
       })
-        return newNode!;
   }
 }
