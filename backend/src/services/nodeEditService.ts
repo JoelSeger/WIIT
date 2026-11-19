@@ -74,7 +74,7 @@ export class NodeEditService {
 
         //Extract nodetype for changelog
         // --- 4. traceability -----------------------------------------------------------------
-        const nodeType = await this.repos.nodeTypes().findOne(node.id);
+        const nodeType = await this.repos.nodeTypes(trx).findOne(node.id);
         if (!nodeType) throw new NotFoundError(`NodeType with id: ${node.id} was not found`);
         await this.repos.changeLog(trx).record({
             entityType: "node",
