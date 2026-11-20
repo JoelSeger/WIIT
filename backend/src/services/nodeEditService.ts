@@ -137,7 +137,6 @@ export class NodeEditService {
   }
 
   async publishUnpublishNode(nodeId: number, userId: number): Promise<Node> {
-          comment: "Changed the published status",
     return this.knex.transaction(async (trx) => {
       const node = await this.repos.nodes(trx).flipPublished(nodeId);
       await this.repos.changeLog(trx).record({
