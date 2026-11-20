@@ -151,9 +151,22 @@ export class NodePropertyController extends BaseController {
     }
   };
 
-  private nodeId(req: Request): number {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id) || id <= 0) throw new ValidationError("A valid node id is required");
-    return id;
+  publishUnpublishNode = async (req: Request, res: Response): Promise<void> => {
+      try {
+          const nodeId = this.nodeId(req);
+          const user = req.session.user;
+          if (!user) {
+              this.unauthorized(res);
+              return;
+          }
+          if (!user.id) {
+              this.unauthorized(res);
+              return;
+          }
+          const node = await this.editing.publishUnpublishNode(nodeId, user.id)
+          this.success(res, node)
+      } catch (err: any) {
+          this.handleError(res, err);
+      }
   }
 }

@@ -5,6 +5,7 @@ import { NodePropertyController } from "../controllers/nodePropertyController";
 import { NodeDeleteController } from "../controllers/nodeDeleteController";
 import { requireRole } from "../middleware/auth";
 
+
 export function createNodeCreationRouter(knex: Knex): Router {
   const router = Router();
 
@@ -23,8 +24,9 @@ export function createNodeCreationRouter(knex: Knex): Router {
 
   router.get("/:id/form", requireRole("editor"), properties.getForm);
   router.get("/:id/activities", requireRole("editor"), properties.getActivities);
-    // Can be created on a process  
+    // Can be created on a process
   router.put("/:id/activities", requireRole("editor"), properties.saveActivities);
+  router.put("/:id/publish", requireRole("editor"), properties.publishUnpublishNode)
 
   return router;
 }

@@ -6,7 +6,7 @@ import type { NodeTypeRepository } from "../repos/nodeTypeRepository";
 import type { PropertyDefinitionRepository } from "../repos/propertyDefinitionRepository";
 import type { StructureRepository } from "../repos/structureRepository";
 
-export class NodeService {
+export class NodeTreeService {
   constructor(
     private readonly nodes: NodeRepository,
     private readonly nodeTypes: NodeTypeRepository,

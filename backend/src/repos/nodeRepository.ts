@@ -4,6 +4,7 @@ import type { Node } from "../models/node/node";
 import type { NodePropertyValues } from "../models/node/nodePropertyValues";
 import type { CreateNodeData } from "../types/nodeCreation.types";
 import type { NodeAttributeChanges } from "../types/nodeEdit.types";
+import {NotFoundError} from "../services/errorService";
 
 export class NodeRepository extends CrudRepository<Node> {
   constructor(knex: Knex, trx?: Knex.Transaction) {
@@ -205,5 +206,32 @@ export class NodeRepository extends CrudRepository<Node> {
       updatedAt: row.updatedAt,
       updatedBy: row.updatedBy,
     };
+  }
+
+  async flipPublished(nodeId: number): Promise<Node> {
+      const node = await this.qb.where("id", nodeId).select().first();
+
+      if (!node) {
+        throw new NotFoundError(`Node ${nodeId} was not found`);
+      }
+
+      const nextStatus = !node.isPublished;
+      node.isPublished = nextStatus;
+
+      await this.qb.where("id", nodeId).update({ isPublished: nextStatus });
+      return node;
+  }
+
+  async flipPublishedByStructure(structureId: number, nextStatus: boolean): Promise<Node[]> {
+
+    await this.qb.where({ structureId: structureId }).update({ isPublished: nextStatus });
+
+    const nodes = await this.qb.where({ structureId: structureId }).select();
+
+    if (!nodes || nodes.length == 0) {
+      return [];
+    }
+
+    return nodes
   }
 }
