@@ -1,18 +1,7 @@
 import type { PropertyDataType } from "../models/property/propertyDefinition";
+import type { PropertyTabKind } from "../models/property/propertyTab";
 
-/** Tabs of the node form, in display order. Must match ck_property_definitions_tab (migration 011). */
-export const TAB_LABELS = {
-  allmant: "Allmänt",
-  handlingsslag: "Handlingsslag",
-  handlingstyper: "Handlingstyper",
-  aktiviteter: "Aktiviteter",
-  diagram: "Diagram",
-  beskrivning: "Beskrivning",
-  referenser: "Referenser",
-} as const;
-
-export type TabKey = keyof typeof TAB_LABELS;
-export const TAB_ORDER = Object.keys(TAB_LABELS) as TabKey[];
+// The tabs (key, label, order) are rows in property_tabs since migration 013, not a list here.
 
 export type PropertyScalar = string | number | boolean | null;
 
@@ -50,8 +39,10 @@ export interface FormField {
 }
 
 export interface FormTab {
-  tabKey: TabKey;
+  tabKey: string;
   label: string;
+  /** What the tab shows (property_tabs.kind). Tabs in the form always have fields. */
+  kind: PropertyTabKind;
   fields: FormField[];
 }
 
