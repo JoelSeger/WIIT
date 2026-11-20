@@ -7,9 +7,6 @@ import type { Node } from "../models/node/node";
 import type { NodeForm } from "../types/node.properties.types";
 import type { EditNodeRequest, NodeAttributeChanges } from "../types/nodeEdit.types";
 
-import { ChangeLog } from "../models/changeLog";
-import { ChangeLogRepository } from "../repos/changeLogRepository";
-
 /** What is written to change_log: only the things that really changed, old and new. */
 type Snapshot = Record<string, unknown>;
 
@@ -140,19 +137,19 @@ export class NodeEditService {
   }
 
   async publishUnpublishNode(nodeId: number, userId: number): Promise<Node> {
-      return await this.knex.transaction(async (trx) => {
-        const newNode = await this.repos.nodes().flipPublished(nodeId);
-        this.repos.changeLog(trx).record({
-          entityType: "node",
-          entityId: newNode.id,
-          structureId: newNode.structureId,
-          action: "update",
-          oldValue: (!newNode.isPublished!).toString(),
-          newValue: newNode.isPublished!.toString(),
           comment: "Changed the published status",
-          changedBy: userId,
-        });
-        return newNode;
-      })
+    return this.knex.transaction(async (trx) => {
+      const node = await this.repos.nodes(trx).flipPublished(nodeId);
+      await this.repos.changeLog(trx).record({
+        entityType: "node",
+        entityId: node.id,
+        structureId: node.structureId,
+        action: node.isPublished ? "publish" : "unpublish",
+        oldValue: JSON.stringify({ isPublished: !node.isPublished }),
+        newValue: JSON.stringify({ isPublished: node.isPublished }),
+        changedBy: userId,
+      });
+      return node;
+    });
   }
 }
