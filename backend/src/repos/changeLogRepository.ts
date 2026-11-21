@@ -4,8 +4,8 @@ import type { ChangeLog } from "../models/changeLog";
 
 /** change_log is append-only (migration 005): this repository only adds rows. */
 export class ChangeLogRepository extends CrudRepository<ChangeLog> {
-  constructor(knex: Knex, trx?: Knex.Transaction) {
-    super(knex, "change_log", trx);
+  constructor(knex: Knex) {
+    super(knex, "change_log");
   }
 
   //ID and changedAt should be handled by the database not the program.

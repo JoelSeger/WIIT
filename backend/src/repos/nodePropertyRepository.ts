@@ -3,8 +3,8 @@ import { CrudRepository } from "./crudRepository";
 import type { NodePropertyValues } from "../models/node/nodePropertyValues";
 
 export class NodePropertyRepository extends CrudRepository<NodePropertyValues> {
-  constructor(knex: Knex, trx?: Knex.Transaction) {
-    super(knex, "node_property_values", trx);
+  constructor(knex: Knex) {
+    super(knex, "node_property_values");
   }
 
   async findByNodeId(nodeId: number): Promise<NodePropertyValues[]> {

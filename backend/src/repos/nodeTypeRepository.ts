@@ -3,8 +3,8 @@ import { CrudRepository } from "./crudRepository";
 import type { NodeType } from "../models/node/nodeType";
 
 export class NodeTypeRepository extends CrudRepository<NodeType> {
-  constructor(knex: Knex, trx?: Knex.Transaction) {
-    super(knex, "node_types", trx);
+  constructor(knex: Knex) {
+    super(knex, "node_types");
   }
 
   async findByIds(ids: number[]): Promise<NodeType[]> {

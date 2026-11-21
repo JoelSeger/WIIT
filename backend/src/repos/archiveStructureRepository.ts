@@ -1,5 +1,6 @@
 
 import type { Knex } from "knex";
+import { CrudRepository } from "./crudRepository";
 
 // camelCase, like models/archive/archiveStructure.ts: knex-stringcase maps the columns.
 export interface ArchiveStructure {
@@ -12,19 +13,13 @@ export interface ArchiveStructure {
   createdBy: number | null;
 }
 
-export class ArchiveStructureRepository {
-  constructor(
-    private readonly knex: Knex,
-    private readonly trx?: Knex.Transaction,
-  ) {}
+export class ArchiveStructureRepository extends CrudRepository<ArchiveStructure> {
+    constructor(knex: Knex) {
+      super(knex, "archive_structures")
+    }
 
-  private get qb(): Knex.QueryBuilder {
-    return (this.trx ?? this.knex)("archive_structures");
-  }
 
-  async create(
-    item: Omit<ArchiveStructure, "id" | "created_at">,
-  ): Promise<ArchiveStructure> {
+  async create(item: Omit<ArchiveStructure, "id" | "created_at">): Promise<ArchiveStructure> {
     const [created] = await this.qb
       .insert(item)
       .returning("*");

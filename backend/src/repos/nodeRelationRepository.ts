@@ -3,8 +3,8 @@ import { CrudRepository } from "./crudRepository";
 import type { NodeRelation } from "../models/node/nodeRelation";
 
 export class NodeRelationRepository extends CrudRepository<NodeRelation> {
-  constructor(knex: Knex, trx?: Knex.Transaction) {
-    super(knex, "node_relations", trx);
+    constructor(knex: Knex) {
+    super(knex, "node_relations");
   }
 
   /**

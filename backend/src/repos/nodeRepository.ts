@@ -7,8 +7,8 @@ import type { NodeAttributeChanges } from "../types/nodeEdit.types";
 import {NotFoundError} from "../services/errorService";
 
 export class NodeRepository extends CrudRepository<Node> {
-  constructor(knex: Knex, trx?: Knex.Transaction) {
-    super(knex, "nodes", trx);
+  constructor(knex: Knex) {
+    super(knex, "nodes");
   }
 
   // ---------- from develop (used by getTree) ----------

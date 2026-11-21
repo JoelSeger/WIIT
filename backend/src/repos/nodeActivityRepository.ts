@@ -3,8 +3,8 @@ import { CrudRepository } from "./crudRepository";
 import type { NodeActivity } from "../models/node/nodeActivity";
 
 export class NodeActivityRepository extends CrudRepository<NodeActivity> {
-  constructor(knex: Knex, trx?: Knex.Transaction) {
-    super(knex, "node_activities", trx);
+  constructor(knex: Knex) {
+    super(knex, "node_activities");
   }
 
   async findByNodeId(nodeId: number): Promise<NodeActivity[]> {

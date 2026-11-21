@@ -4,8 +4,8 @@ import type { PropertyDefinition } from "../models/property/propertyDefinition";
 import type { PropertyOption } from "../models/property/propertyOption";
 
 export class PropertyDefinitionRepository extends CrudRepository<PropertyDefinition> {
-  constructor(knex: Knex, trx?: Knex.Transaction) {
-    super(knex, "property_definitions", trx);
+  constructor(knex: Knex) {
+    super(knex, "property_definitions");
   }
 
   async findByIds(ids: number[]): Promise<PropertyDefinition[]> {

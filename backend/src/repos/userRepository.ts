@@ -3,8 +3,8 @@ import { User } from "../models/user";
 import { CrudRepository } from "./crudRepository";
 
 export class UserRepository extends CrudRepository<User> {
-  constructor(knex: Knex, tableName: string) {
-    super(knex, tableName);
+  constructor(knex: Knex) {
+    super(knex, "users");
   }
 
   async getAll(limit: number, offset: number): Promise<User[]> {
