@@ -7,9 +7,6 @@ import type { Node } from "../models/node/node";
 import type { NodeForm } from "../types/node.properties.types";
 import type { EditNodeRequest, NodeAttributeChanges } from "../types/nodeEdit.types";
 
-import { ChangeLog } from "../models/changeLog";
-import { ChangeLogRepository } from "../repos/changeLogRepository";
-
 /** What is written to change_log: only the things that really changed, old and new. */
 type Snapshot = Record<string, unknown>;
 

@@ -4,7 +4,7 @@ import type { Node } from "../models/node/node";
 import type { NodePropertyValues } from "../models/node/nodePropertyValues";
 import type { CreateNodeData } from "../types/nodeCreation.types";
 import type { NodeAttributeChanges } from "../types/nodeEdit.types";
-import { Structure } from "../models/structure/structure";
+import {NotFoundError} from "../services/errorService";
 
 export class NodeRepository extends CrudRepository<Node> {
   constructor(knex: Knex, trx?: Knex.Transaction) {
@@ -212,7 +212,7 @@ export class NodeRepository extends CrudRepository<Node> {
       const node = await this.qb.where("id", nodeId).select().first();
 
       if (!node) {
-          throw new Error(`Node with id: ${nodeId} does not exist`)
+        throw new NotFoundError(`Node ${nodeId} was not found`);
       }
 
       const nextStatus = !node.isPublished;
