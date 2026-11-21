@@ -6,6 +6,9 @@ import type { NodeTypeRepository } from "../repos/nodeTypeRepository";
 import type { PropertyDefinitionRepository } from "../repos/propertyDefinitionRepository";
 import type { StructureRepository } from "../repos/structureRepository";
 
+/** sort_order for a value whose field is not linked to the node type: after the linked fields. */
+const UNPLACED_ORDER = 1000;
+
 export class NodeTreeService {
   constructor(
     private readonly nodes: NodeRepository,
@@ -34,28 +37,48 @@ export class NodeTreeService {
 
     const values = await this.nodes.findValuesByStructure(structureId);
 
-    const [types, defs] = await Promise.all([
-      this.nodeTypes.findByIds([...new Set(nodes.map((n) => n.nodeTypeId))]),
-      this.definitions.findByIds([...new Set(values.map((v) => v.propertyDefinitionId))]),
+    const typeIds = [...new Set(nodes.map((n) => n.nodeTypeId))];
+    const [types, placed] = await Promise.all([
+      this.nodeTypes.findByIds(typeIds),
+      this.definitions.findPlacedByNodeTypes(typeIds),
     ]);
 
-    const valuesByNode = this.groupValues(values, new Map(defs.map((d) => [d.id, d])), publicOnly);
+    // Migration 013: a field can be on several node types, with its own order and label on each,
+    // so a value is matched on (node type, field), not on the field alone.
+    const typeOfNode = new Map(nodes.map((n) => [n.id, n.nodeTypeId]));
+    const defFor = new Map(placed.map((d) => [`${d.nodeTypeId}:${d.id}`, d]));
+    const keyOf = (v: NodePropertyValues) => `${typeOfNode.get(v.nodeId)}:${v.propertyDefinitionId}`;
+
+    // A value whose field is not linked to the node's type (the link was removed later) is still
+    // shown, after the linked fields. Migration 013 links every field that had values.
+    const unplaced = [...new Set(values.filter((v) => !defFor.has(keyOf(v))).map((v) => v.propertyDefinitionId))];
+    if (unplaced.length > 0) {
+      const fields = new Map((await this.definitions.findByIds(unplaced)).map((f) => [f.id, f]));
+      for (const v of values) {
+        const field = fields.get(v.propertyDefinitionId);
+        if (!field || defFor.has(keyOf(v))) continue;
+        const nodeTypeId = typeOfNode.get(v.nodeId)!;
+        defFor.set(keyOf(v), { ...field, nodeTypeId, tabKey: null, groupKey: null, sortOrder: UNPLACED_ORDER, isRequired: false });
+      }
+    }
+
+    const valuesByNode = this.groupValues(values, (v) => defFor.get(keyOf(v)), publicOnly);
     const typeById = new Map(types.map((t) => [t.id, t]));
 
     const roots = this.nest(nodes, typeById, valuesByNode);
     return publicOnly ? this.prunePublic(roots) : roots;
   }
 
-  /** Attaches each value to its field definition, drops non-public fields in public mode, keeps file order. */
+  /** Attaches each value to its field on the node's type, drops non-public fields in public mode, sorts by the node type's field order. */
   private groupValues(
     values: NodePropertyValues[],
-    defById: Map<number, NodeValue["definition"]>,
+    definitionOf: (v: NodePropertyValues) => NodeValue["definition"] | undefined,
     publicOnly: boolean,
   ): Map<number, NodeValue[]> {
     const byNode = new Map<number, NodeValue[]>();
 
     for (const v of values) {
-      const definition = defById.get(v.propertyDefinitionId);
+      const definition = definitionOf(v);
       if (!definition) continue;
       if (publicOnly && !definition.isPublic) continue;   // OSL / GDPR
 
@@ -66,7 +89,9 @@ export class NodeTreeService {
 
     for (const list of byNode.values()) {
       list.sort((a, b) =>
-        a.definition.sortOrder - b.definition.sortOrder || a.valueOrder - b.valueOrder);
+        a.definition.sortOrder - b.definition.sortOrder
+        || a.propertyDefinitionId - b.propertyDefinitionId
+        || a.valueOrder - b.valueOrder);
     }
     return byNode;
   }

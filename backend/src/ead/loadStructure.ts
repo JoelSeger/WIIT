@@ -23,7 +23,7 @@ export type EadLevel =
   | 'collection' | 'fonds' | 'class' | 'recordgrp' | 'series' | 'subfonds'
   | 'subgrp' | 'subseries' | 'file' | 'item' | 'otherlevel';
 
-export type PropertyDataType = 'text' | 'longtext' | 'number' | 'date' | 'boolean' | 'url' | 'enum'; // enum: migration 009, value in value_text
+export type PropertyDataType = 'text' | 'longtext' | 'number' | 'integer' | 'date' | 'boolean' | 'url' | 'enum'; // enum: 009, value in value_text. integer: 013, value in value_number
 
 export type CreatorType = 'corporate' | 'person' | 'family';
 
@@ -222,15 +222,24 @@ export async function loadStructure(
   if (nodeIds.length === 0) return { structure, archive, roots: [] };
 
   // Property values (only the typed column that is set is used)
+  // 013: the order and label of a field belong to the node type (node_type_properties).
+  // Left join: a value whose field is no longer linked to the node type is still exported, last.
   const propQuery = knex('node_property_values as v')
     .join('property_definitions as d', 'd.id', 'v.property_definition_id')
     .join('nodes as n', 'n.id', 'v.node_id')
+    .leftJoin('node_type_properties as l', function () {
+      this.on('l.node_type_id', '=', 'n.node_type_id').andOn('l.property_definition_id', '=', 'd.id');
+    })
     .where('n.structure_id', structureId)
     .select(
-      'v.node_id', 'd.key', 'd.label', 'd.data_type', 'd.ead_element', 'd.sort_order',
+      'v.node_id', 'd.key', 'd.data_type', 'd.ead_element',
+      knex.raw('COALESCE(l.label_override, d.label) AS label'),
+      knex.raw('COALESCE(l.sort_order, 1000) AS sort_order'),
       'v.value_text', 'v.value_number', 'v.value_date', 'v.value_boolean',
     )
-    .orderBy([{ column: 'v.node_id' }, { column: 'd.sort_order' }]);
+    .orderBy('v.node_id')
+    .orderByRaw('COALESCE(l.sort_order, 1000)')   // not the alias: nodes also has a sort_order column
+    .orderBy([{ column: 'd.id' }, { column: 'v.value_order' }]);
   if (publicOnly) propQuery.where('d.is_public', true);
   const propRows: PropertyQueryRow[] = await propQuery;
 
@@ -369,7 +378,8 @@ export function buildTree(
 
 function pickValue(p: PropertyQueryRow): string | null {
   switch (p.data_type) {
-    case 'number':  return p.value_number == null ? null : String(Number(p.value_number));
+    case 'number':
+    case 'integer': return p.value_number == null ? null : String(Number(p.value_number));
     case 'date':    return p.value_date == null ? null : toIsoDate(p.value_date);
     case 'boolean': return p.value_boolean == null ? null : (p.value_boolean ? 'Ja' : 'Nej');
     default:        return p.value_text;

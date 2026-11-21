@@ -3,9 +3,8 @@ import { createRepositories, type Repositories } from "../repos/repositories";
 import type { PropertyDefinition } from "../models/property/propertyDefinition";
 import type { NodePropertyValues } from "../models/node/nodePropertyValues";
 import type { Node } from "../models/node/node";
+import type { PropertyTab } from "../models/property/propertyTab";
 import {
-  TAB_LABELS,
-  TAB_ORDER,
   type FormField,
   type FormFieldValue,
   type FormTab,
@@ -13,7 +12,6 @@ import {
   type NodeHeader,
   type PropertyScalar,
   type PropertyValueInput,
-  type TabKey,
 } from "../types/node.properties.types";
 import { NotFoundError, ValidationError } from "../services/errorService";
 
@@ -52,10 +50,11 @@ export class NodePropertyService {
     const defs = await defRepo.findActiveByNodeType(node.nodeTypeId);
     const options = await defRepo.findActiveOptions(defs.filter((d) => d.dataType === "enum").map((d) => d.id));
     const stored = await this.repos.nodeProperties().findByNodeId(nodeId);
+    const allTabs = await defRepo.findActiveTabs();
 
-    const byTab = new Map<TabKey, FormField[]>();
+    const byTab = new Map<string, FormField[]>();
     for (const def of defs) {
-      const tabKey = this.asTabKey(def.tabKey);
+      const tabKey = this.asTabKey(def.tabKey, allTabs);
       const field: FormField = {
         key: def.key,
         label: def.label,
@@ -74,10 +73,12 @@ export class NodePropertyService {
       byTab.set(tabKey, [...(byTab.get(tabKey) ?? []), field]);
     }
 
-    const tabs: FormTab[] = TAB_ORDER.filter((k) => byTab.has(k)).map((k) => ({
-      tabKey: k,
-      label: TAB_LABELS[k],
-      fields: byTab.get(k)!,
+    // Tab order and labels come from property_tabs (migration 013). Only tabs with fields are sent.
+    const tabs: FormTab[] = allTabs.filter((t) => byTab.has(t.key)).map((t) => ({
+      tabKey: t.key,
+      label: t.label,
+      kind: t.kind,
+      fields: byTab.get(t.key)!,
     }));
 
     // The columns of the node itself (Namn, Beteckning, Giltig från/till …). They are not property
@@ -241,8 +242,12 @@ export class NodePropertyService {
     };
   }
 
-  private asTabKey(value: string | null): TabKey {
-    return value && value in TAB_LABELS ? (value as TabKey) : "allmant";
+  /**
+   * A field on a tab that is retired (or missing) is shown on Allmänt, so its values do not
+   * disappear from the form.
+   */
+  private asTabKey(value: string | null, tabs: PropertyTab[]): string {
+    return value && tabs.some((t) => t.key === value) ? value : "allmant";
   }
 
   private toDateString(d: unknown): string | null {
@@ -305,6 +310,13 @@ export class NodePropertyService {
         return { ...EMPTY, valueNumber: n };
       }
 
+      case "integer": {
+        // heltal (migration 013): stored in value_number like decimals, but must be whole
+        const n = typeof raw === "number" ? raw : Number(String(raw).trim());
+        if (!Number.isSafeInteger(n)) throw bad("a whole number");
+        return { ...EMPTY, valueNumber: n };
+      }
+
       case "date": {
         const text = String(raw).trim();
         const ok = /^\d{4}-\d{2}-\d{2}$/.test(text) && !Number.isNaN(Date.parse(text));
@@ -324,6 +336,7 @@ export class NodePropertyService {
   private readValue(def: PropertyDefinition, row: NodePropertyValues): PropertyScalar {
     switch (def.dataType) {
       case "number":
+      case "integer":
         return row.valueNumber === null || row.valueNumber === undefined ? null : Number(row.valueNumber);
       case "date": {
         const d = row.valueDate;

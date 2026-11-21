@@ -115,9 +115,9 @@ interface NodeTypeRow {
   ead_unit_description: string | null;
 }
 
+/** A field in the shared list (013: no node type of its own, see node_type_properties). */
 interface PropertyDefRow {
   id: number;
-  node_type_id: number;
   key: string;
   label: string;
   data_type: string;
@@ -189,7 +189,10 @@ const UNRESOLVED_REF: PropertySpec = { key: 'ead_referens', label: 'Olöst EAD-r
 const RELATION_TYPE = { code: 'relaterad_till', name: 'relaterad till', inverse_name: 'relaterad från', ead_element: 'relatedmaterial' };
 
 // Column lengths in the migrations; longer values would make SQL Server reject the whole import
-const MAX = { title: 500, reference_code: 100, external_id: 255, code: 50, source_updated_by: 255 };
+const MAX = { title: 500, reference_code: 100, external_id: 255, code: 50, source_updated_by: 255, key: 100 };
+
+/** text and longtext hold the same kind of value, so a field of one can take a value meant for the other. */
+const TEXTUAL = new Set(['text', 'longtext']);
 
 
 /**
@@ -276,7 +279,14 @@ export async function importEad(knex: Knex, input: ImportInput): Promise<ImportR
     const rootTypeIds = new Set<number>();
 
     const propertyDefs: PropertyDefRow[] = await trx('property_definitions')
-      .select('id', 'node_type_id', 'key', 'label', 'data_type', 'ead_element', 'is_repeatable');
+      .select('id', 'key', 'label', 'data_type', 'ead_element', 'is_repeatable');
+    // 013: which node types have which field. Kept in memory like propertyDefs.
+    const fieldsOfType = new Map<number, Set<number>>();
+    for (const l of await trx('node_type_properties').select('node_type_id', 'property_definition_id')) {
+      const typeId = Number(l.node_type_id);
+      fieldsOfType.set(typeId, (fieldsOfType.get(typeId) ?? new Set()).add(Number(l.property_definition_id)));
+    }
+    const usedKeys = new Set(propertyDefs.map((d) => norm(d.key)));
     // F3.6: the database cannot check listruta values (migration 009), so the import does
     const options: Array<{ property_definition_id: number; value: string }> = await trx('property_options')
       .where({ is_active: true }).select('property_definition_id', 'value');
@@ -318,26 +328,53 @@ export async function importEad(knex: Knex, input: ImportInput): Promise<ImportR
     };
 
     /**
-     * The field a value is stored in. A field the archivist has set up is reused (matched on
-     * EAD element first, then on key) and only a missing one is created, so Klara's values land
-     * in the fields from the client's Excel.
+     * The field a value is stored in. A field the archivist has set up is reused and only a
+     * missing one is created, so Klara's values land in the fields from the client's Excel:
+     *   1. a field already on this node type, matched on EAD element first, then on key;
+     *   2. a field with the same key on another node type, if the value fits its data type.
+     *      It is linked to this node type too (013: one field, several node types);
+     *   3. otherwise a new field. If the key is taken by a field of another data type, the
+     *      new one gets the node type code added (gallringsfrist_arkiv), like migration 013.
+     * A new link goes on the Allmänt tab, after the fields the archivist placed.
      */
     const definitionFor = async (nodeTypeId: number, spec: PropertySpec, multiple: boolean): Promise<PropertyDefRow> => {
-      const ofType = propertyDefs.filter((d) => d.node_type_id === nodeTypeId);
+      const linkedIds = fieldsOfType.get(nodeTypeId) ?? new Set<number>();
+      const ofType = propertyDefs.filter((d) => linkedIds.has(d.id));
       let def = (spec.eadElement && ofType.find((d) => d.ead_element === spec.eadElement))
         || ofType.find((d) => norm(d.key) === norm(spec.key));
+
       if (!def) {
+        def = propertyDefs.find((d) => norm(d.key) === norm(spec.key)
+          && (d.data_type === spec.dataType || (TEXTUAL.has(d.data_type) && TEXTUAL.has(spec.dataType))));
+      }
+
+      if (!def) {
+        let key = spec.key;
+        if (usedKeys.has(norm(key))) {
+          const typeCode = nodeTypes.find((t) => t.id === nodeTypeId)?.code ?? String(nodeTypeId);
+          const base = `${spec.key}_${typeCode}`.slice(0, MAX.key);
+          key = base;
+          for (let i = 2; usedKeys.has(norm(key)); i++) key = `${base.slice(0, MAX.key - 4)}_${i}`;
+        }
+        usedKeys.add(norm(key));
         const id = insertId(await trx('property_definitions').insert({
-          node_type_id: nodeTypeId, key: spec.key, label: spec.label, data_type: spec.dataType,
+          key, label: spec.label, data_type: spec.dataType,
           ead_element: spec.eadElement, is_public: spec.isPublic, is_repeatable: spec.repeatable || multiple,
-          sort_order: 100 + ofType.length,   // after the fields the archivist set up
         }, ['id']));
-        def = { id, node_type_id: nodeTypeId, key: spec.key, label: spec.label, data_type: spec.dataType,
+        def = { id, key, label: spec.label, data_type: spec.dataType,
           ead_element: spec.eadElement, is_repeatable: spec.repeatable || multiple };
         propertyDefs.push(def);
       } else if (multiple && !def.is_repeatable) {
         await trx('property_definitions').where({ id: def.id }).update({ is_repeatable: true });
         def.is_repeatable = true;
+      }
+
+      if (!linkedIds.has(def.id)) {
+        await trx('node_type_properties').insert({
+          node_type_id: nodeTypeId, property_definition_id: def.id,
+          tab_key: 'allmant', sort_order: 100 + linkedIds.size,   // after the fields the archivist set up
+        });
+        fieldsOfType.set(nodeTypeId, linkedIds.add(def.id));
       }
       return def;
     };
@@ -367,6 +404,12 @@ export async function importEad(knex: Knex, input: ImportInput): Promise<ImportR
           const n = Number(value.replace(',', '.').replace(/\s/g, ''));
           if (Number.isFinite(n)) return { value_number: n };
           warnings.push(`${where}: "${value}" är inget tal – sparad som text, syns inte i fältet.`);
+          return { value_text: value };
+        }
+        case 'integer': {
+          const n = Number(value.replace(/\s/g, ''));
+          if (Number.isSafeInteger(n)) return { value_number: n };
+          warnings.push(`${where}: "${value}" är inget heltal – sparad som text, syns inte i fältet.`);
           return { value_text: value };
         }
         case 'enum': {

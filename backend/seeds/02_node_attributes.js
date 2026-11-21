@@ -1,9 +1,18 @@
 /**
  * Fields per node level, from "Sammanfattning av information som vi behöver för att skapa struktur".
  *
- * Idempotent: an existing field only gets tab / group / has_own_published / sort_order updated,
- * so labels and help texts edited in the admin UI are kept. (sort_order is included so that a
- * column added in the middle of a table, e.g. Filnamn/Länk, ends up in the right place.)
+ * Since migration 013 a field is ONE row (property_definitions) that several node types can use.
+ * Where it sits on each node type (tab, table, order, label) is its link in node_type_properties.
+ * Kortnamn is one field on verksamhetsområde, processgrupp, process, handlingsslag and handlingstyp,
+ * with its own label and tab on handlingsslag and handlingstyp.
+ *
+ * Idempotent:
+ *   - a node type that already has the field only gets tab / group / sort_order updated (and
+ *     has_own_published on the field), so labels and help texts edited in the admin UI are kept;
+ *   - a field that exists on another node type is linked, if it has the same data type. A
+ *     different label becomes label_override on this node type;
+ *   - a key taken by a field of another data type gets a new field with the node type code
+ *     added (like migration 013 does).
  * All fields are optional (is_required = false).
  * Name, Beteckning, Tidigare beteckning, Giltig från/till, Beskrivning and the node type are
  * columns on `nodes`, so they are NOT property definitions.
@@ -11,30 +20,57 @@
  * Run after 01_demo.js:  npm run seed
  */
 
-async function upsert(knex, nodeTypeId, def) {
+async function upsert(knex, type, def) {
   const placement = {
     tab_key: def.tab_key,
     group_key: def.group_key ?? null,
-    has_own_published: def.has_own_published ?? false,
     sort_order: def.sort_order,
   };
-  const existing = await knex('property_definitions')
-    .where({ node_type_id: nodeTypeId, key: def.key }).first();
-  if (existing) {
-    await knex('property_definitions').where({ id: existing.id }).update(placement);
+  const dataType = def.data_type ?? 'text';
+
+  // 1. Already on this node type: placement only
+  const linked = await knex('property_definitions as d')
+    .join('node_type_properties as l', 'l.property_definition_id', 'd.id')
+    .where({ 'l.node_type_id': type.id, 'd.key': def.key })
+    .first('d.id');
+  if (linked) {
+    await knex('node_type_properties')
+      .where({ node_type_id: type.id, property_definition_id: linked.id }).update(placement);
+    if (def.has_own_published) {
+      await knex('property_definitions').where({ id: linked.id }).update({ has_own_published: true });
+    }
     return;
   }
-  await knex('property_definitions').insert({
-    node_type_id: nodeTypeId,
-    key: def.key,
-    label: def.label,
-    data_type: def.data_type ?? 'text',
+
+  // 2. The field exists (on another node type) with the same data type: link it
+  let field = await knex('property_definitions').where({ key: def.key }).first();
+  let key = def.key;
+  if (field && field.data_type !== dataType) {
+    key = `${def.key}_${type.code}`;
+    field = await knex('property_definitions').where({ key }).first();
+  }
+
+  // 3. New field
+  if (!field) {
+    const [row] = await knex('property_definitions').insert({
+      key,
+      label: def.label,
+      data_type: dataType,
+      is_public: def.is_public ?? true,
+      is_repeatable: def.is_repeatable ?? false,
+      has_own_published: def.has_own_published ?? false,
+      ead_element: def.ead_element ?? null,
+      help_text: def.help_text ?? null,
+      is_active: true,
+    }, ['id']);
+    field = { id: row.id, label: def.label };
+  }
+
+  await knex('node_type_properties').insert({
+    node_type_id: type.id,
+    property_definition_id: field.id,
     is_required: false,
-    is_public: def.is_public ?? true,
-    is_repeatable: def.is_repeatable ?? false,
-    ead_element: def.ead_element ?? null,
-    help_text: def.help_text ?? null,
-    is_active: true,
+    label_override: def.label === field.label ? null : def.label,
     ...placement,
   });
 }
@@ -69,7 +105,7 @@ const BY_TYPE = {
   handlingsslag: [
     { key: 'kortnamn',       label: 'Kortnamn, handlingsslag',     sort_order: 1, tab_key: 'handlingsslag' },
     { key: 'publikt_namn',   label: 'Publika handlingsslagsnamn',  sort_order: 2, tab_key: 'handlingsslag' },
-    { key: 'gallringsfrist', label: 'Gallringsfrist (värde)',      sort_order: 3, tab_key: 'handlingsslag', data_type: 'number' },
+    { key: 'gallringsfrist', label: 'Gallringsfrist (värde)',      sort_order: 3, tab_key: 'handlingsslag', data_type: 'integer' },
     { key: 'gallringsfrist_enhet', label: 'Gallringsfrist (enhet)', sort_order: 4, tab_key: 'handlingsslag' },
     { key: 'informationsagare', label: 'Informationsägare',        sort_order: 5, tab_key: 'handlingsslag', has_own_published: true },
   ],
@@ -79,9 +115,11 @@ const BY_TYPE = {
     { key: 'kortnamn',      label: 'Kortnamn',      sort_order: 1, tab_key: 'allmant' },
     { key: 'strukturenhet', label: 'Strukturenhet', sort_order: 2, tab_key: 'allmant' },
     { key: 'tidsperiod',    label: 'Tidsperiod',    sort_order: 3, tab_key: 'allmant' },
-    { key: 'gallringsfrist', label: 'Gallringsfrist', sort_order: 4, tab_key: 'allmant' },
+    // Gallringsfrist is a whole number plus a unit (8 | År) in Klara, the same fields as on handlingsslag
+    { key: 'gallringsfrist', label: 'Gallringsfrist', sort_order: 4, tab_key: 'allmant', data_type: 'integer' },
+    { key: 'gallringsfrist_enhet', label: 'Gallringsfrist (enhet)', sort_order: 5, tab_key: 'allmant' },
     // Beskrivning
-    { key: 'kortbeskrivning', label: 'Kort beskrivning', sort_order: 5, tab_key: 'beskrivning', data_type: 'longtext' },
+    { key: 'kortbeskrivning', label: 'Kort beskrivning', sort_order: 6, tab_key: 'beskrivning', data_type: 'longtext' },
     // Beskrivningsfält: Värde | Eget | Publicerad
     { key: 'sekretess',             label: 'Sekretess',             sort_order: 10, tab_key: 'beskrivning', has_own_published: true, is_public: false },
     { key: 'gallringsforeskrifter', label: 'Gallringsföreskrifter', sort_order: 11, tab_key: 'beskrivning', has_own_published: true },
@@ -99,6 +137,6 @@ exports.seed = async function (knex) {
       console.warn(`node type '${code}' not found – run 01_demo.js first`);
       continue;
     }
-    for (const def of defs) await upsert(knex, type.id, def);
+    for (const def of defs) await upsert(knex, type, def);
   }
 };

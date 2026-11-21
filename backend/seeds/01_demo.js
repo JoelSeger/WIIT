@@ -42,7 +42,9 @@ exports.seed = async function (knex) {
   await knex('node_activity_handlingstyp').del();   // NEW: checklist rows point at nodes (NO ACTION)
   await knex('node_activities').del();               // NEW: activities point at nodes
   await knex('property_options').del();
+  await knex('node_type_properties').del();          // 013: which node types use which field
   await knex('property_definitions').del();
+  // property_tabs is not cleared: the tabs are created by migration 013
   await knex('archive_structures').del();
   await deleteTree(knex, 'nodes');            // leaves first – a parent with children is protected
   await knex('node_type_rules').del();
@@ -125,7 +127,13 @@ exports.seed = async function (knex) {
   ]);
 
   // Property definitions
-  const pd = (row) => insert('property_definitions', row);
+  // 013: a field is shared; node_type_id, sort_order and is_required go on its link to the node type.
+  // The tab is Allmänt here; seed 02 moves the fields to their tabs.
+  const pd = async ({ node_type_id, sort_order = 0, is_required = false, ...field }) => {
+    const id = await insert('property_definitions', field);
+    await knex('node_type_properties').insert({ node_type_id, property_definition_id: id, sort_order, is_required, tab_key: 'allmant' });
+    return id;
+  };
   const pAnsv = await pd({ node_type_id: process, key: 'ansvarig', label: 'Ansvarig roll', data_type: 'text', ead_element: null, sort_order: 1 });
 
   // Handlingstyp – fields from the client's Excel. Name and Beskrivning are nodes.title / description.
