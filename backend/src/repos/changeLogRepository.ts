@@ -8,6 +8,14 @@ export class ChangeLogRepository extends CrudRepository<ChangeLog> {
     super(knex, "change_log", trx);
   }
 
+
+    async record(entry: Partial<ChangeLog>): Promise<void> {
+        await this.qb
+            .insert({
+                ...entry
+            });
+    }
+
   async logNodeUpdate(entry: {
     nodeId: number;
     structureId: number;

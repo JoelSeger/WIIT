@@ -2,6 +2,7 @@ import type { Knex } from "knex";
 import { createRepositories, type Repositories } from "../repos/repositories";
 import { ConflictError, NotFoundError, isForeignKeyViolation } from "./errorService";
 import type { DeleteNodeRequest, DeletedNode } from "../types/nodeDelete.types";
+import { ChangeLogRepository } from "../repos/changeLogRepository";
 
 /**
  * F3.1 – delete a node that has no children.
@@ -47,9 +48,9 @@ export class NodeDeleteService {
         if (!deleted) throw new NotFoundError(`Node ${request.nodeId} was not found`);
 
         await this.repos.changeLog(trx).logNodeDelete({
-          nodeId: node.id,
-          structureId: node.structureId,
-          oldValue: {
+            nodeId: node.id,
+            structureId: node.structureId,
+            oldValue: {
             parentId: node.parentId,
             nodeTypeId: node.nodeTypeId,
             referenceCode: node.referenceCode,
@@ -61,13 +62,13 @@ export class NodeDeleteService {
             validTo: node.validTo,
             description: node.description,
             removedRelations: relations.map((r) => ({
-              id: r.id,
-              relationTypeId: r.relationTypeId,
-              fromNodeId: r.fromNodeId,
-              toNodeId: r.toNodeId,
+                id: r.id,
+                relationTypeId: r.relationTypeId,
+                fromNodeId: r.fromNodeId,
+                toNodeId: r.toNodeId,
             })),
-          },
-          changedBy: request.deletedBy,
+            },
+            changedBy: request.deletedBy,
         });
 
         return { id: node.id, structureId: node.structureId, title: node.title };

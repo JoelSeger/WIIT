@@ -242,7 +242,7 @@ export class NodePropertyService {
   }
 
   private asTabKey(value: string | null): TabKey {
-    return value && Object.prototype.hasOwnProperty.call(TAB_LABELS, value) ? (value as TabKey) : "allmant";
+    return value && value in TAB_LABELS ? (value as TabKey) : "allmant";
   }
 
   private toDateString(d: unknown): string | null {
@@ -252,11 +252,6 @@ export class NodePropertyService {
 
   private isEmpty(value: PropertyScalar | undefined): boolean {
     return value === null || value === undefined || (typeof value === "string" && value.trim() === "");
-  }
-
-  private isRealDate(text: string): boolean {
-    const d = new Date(`${text}T00:00:00Z`);
-    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === text;
   }
 
   /**
@@ -312,7 +307,7 @@ export class NodePropertyService {
 
       case "date": {
         const text = String(raw).trim();
-        const ok = /^\d{4}-\d{2}-\d{2}$/.test(text) && this.isRealDate(text);
+        const ok = /^\d{4}-\d{2}-\d{2}$/.test(text) && !Number.isNaN(Date.parse(text));
         if (!ok) throw bad("a date as YYYY-MM-DD");
         return { ...EMPTY, valueDate: text };
       }
