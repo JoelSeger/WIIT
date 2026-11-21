@@ -146,6 +146,7 @@ export class NodeEditService {
         action: node.isPublished ? "publish" : "unpublish",
         oldValue: JSON.stringify({ isPublished: !node.isPublished }),
         newValue: JSON.stringify({ isPublished: node.isPublished }),
+        comment: "Changed the published status",
         changedBy: userId,
       });
       return node;
