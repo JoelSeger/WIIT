@@ -47,7 +47,7 @@ export class NodeDeleteService {
         const deleted = await nodes.delete(node.id);
         if (!deleted) throw new NotFoundError(`Node ${request.nodeId} was not found`);
 
-        await this.repos.changeLog().record({
+        await this.repos.changeLog(trx).record({
           entityId: node.id,
           entityType: "node",
           structureId: node.structureId,
