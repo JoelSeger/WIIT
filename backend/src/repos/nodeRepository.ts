@@ -39,7 +39,6 @@ export class NodeRepository extends CrudRepository<Node> {
    * Also what moving a node (F3.5) needs for F6.1.1: the new parent must not be in this set.
    */
   async filterDescendantsOf(ancestorId: number, nodeIds: number[]): Promise<Set<number>> {
-    const db = this.trx ?? this.knex;
     const found = new Set<number>();
     // nodeId -> the ancestor of it we have climbed to so far (starts at the node itself)
     let climbing = new Map<number, number>([...new Set(nodeIds)].map((id) => [id, id]));
@@ -49,7 +48,7 @@ export class NodeRepository extends CrudRepository<Node> {
       const current = [...new Set(climbing.values())];
       const parentOf = new Map<number, number | null>();
       for (let i = 0; i < current.length; i += 500) {   // MSSQL allows at most 2100 parameters
-        const rows: { id: number; parent: number | null }[] = await db("nodes")
+        const rows: { id: number; parent: number | null }[] = await this.qb
           .whereIn("id", current.slice(i, i + 500))
           .select({ id: "id", parent: "parent_id" });
         for (const r of rows) parentOf.set(r.id, r.parent);
