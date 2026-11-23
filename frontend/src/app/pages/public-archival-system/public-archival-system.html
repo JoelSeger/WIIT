@@ -1,51 +1,63 @@
 <div class="page">
-    <div class="page-title">
-        <h1>Välkommen till Malmö Universitets Arkivsök</h1>
+    <div class="mau-welcome">
+        <img
+            src="mau-logo.png"
+            alt="Malmö universitet"
+            class="mau-welcome__logo"
+        />
+
+        <h1 class="mau-welcome__title">
+            <span class="mau-welcome__intro">Välkommen till</span>
+            <span class="mau-welcome__org">Malmö Universitets</span>
+            <span class="mau-welcome__service">Arkivsök</span>
+        </h1>
     </div>
 
     <div class="archive-content">
-
         <div class="archive-search">
-            <input 
-                placeholder="Sök i arkivet..." 
-                type="text"
-                (input)="onSearch($event)"
-            >
-               
-    @if (searchResults.length > 0) {
-        <div class="search-suggestions">
-            @for (result of searchResults; track result.nodeId) {
+            <div class="archive-search__box">
+                <img
+                    src="search.png"
+                    alt=""
+                    aria-hidden="true"
+                    class="archive-search__icon"
+                />
+
+                <input
+                    #searchInput
+                    placeholder="Sök i arkivet..."
+                    type="text"
+                    [value]="searchText"
+                    (input)="onSearch($event)"
+                />
+
+                @if (searchText.length > 0) {
                 <button
-                type="button"
-                class="search-suggestion"
-                (click)="selectSearchResult(result)"
+                    type="button"
+                    class="archive-search__clear"
+                    aria-label="Rensa sökning"
+                    (click)="searchText = ''; searchResults = []; searchCompleted = false; searchInput.focus()"
                 >
-                <span>{{ result.referenceCode ? result.referenceCode + ' ' : '' }}{{ result.title }}</span>
-                <small class="result-structure">{{ result.structureName }}</small>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
                 </button>
+                }
+            </div>
+
+            @if (searchResults.length > 0) {
+            <div class="search-suggestions">
+                @for (result of searchResults; track result.nodeId) {
+                <button type="button" class="search-suggestion" (click)="selectSearchResult(result)">
+                    <span class="result-title">{{ result.referenceCode ? result.referenceCode + ' ' : '' }}{{ result.title }}</span>
+                    <small class="result-structure">{{ result.structureName }}</small>
+                </button>
+                }
+            </div>
+            } @else if (searchCompleted && searchText.trim().length >= 3) {
+            <p class="no-results">Inga sökresultat hittades</p>
             }
-        </div>
-
-    } @else if (searchCompleted && searchText.trim().length >= 3) {
-  
-    <p class="no-results">Inga sökresultat hittades</p>
-  
-}
-  </div>
-
-        <div class="archive-cards">
-            <button type="button">
-                Allmäna Arkivsystemet
-            </button>
-
-            <button type="button">
-                Klassificeringsstruktur
-            </button>
-
-            <button type="button">
-                Förvaringsenheter
-            </button>
-
         </div>
 
         <div class="archive-login-prompt">
@@ -55,6 +67,5 @@
         <div class="archive-saved-last-page">
             <h3>Senast besökta</h3>
         </div>
-
     </div>
 </div>
