@@ -5,12 +5,12 @@
       <img [src]="menuIconUrl" alt="" />
     </button>
 
-    <button class="nav-button" routerLink="/import-archive" aria-label="Lägg till">
-      <img [src]="addIconUrl" alt="Lägg till" />
-    </button>
-
     <button class="nav-button" routerLink="/"  aria-label="Startsida">
       <img [src]="homeIconUrl" alt="Startsida" />
+    </button>
+
+      <button class="nav-button" routerLink="/import-archive" aria-label="Lägg till">
+      <img [src]="addIconUrl" alt="Lägg till" />
     </button>
 
     <button class="nav-button" routerLink="/export-archive" aria-label="Ladda ner">
@@ -25,6 +25,7 @@
     aria-label="Sök i arkivet"
     [value]="searchText"
     (input)="onSearch($event)"
+    (keydown.enter)="onSearchEnter()"
     />
 
     @if (searchSuggestions.length > 0) {

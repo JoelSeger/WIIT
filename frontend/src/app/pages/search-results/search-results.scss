@@ -1,0 +1,42 @@
+
+.search-results-page {
+  max-width: 950px;
+  margin: 0 auto;
+  padding: 40px 30px;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color: #222;
+
+  h1 {
+    font-size: 26px;
+    font-weight: 600;
+    margin: 0 0 16px;
+  }
+}
+
+.results-count {
+  font-size: 15px;
+  color: #666;
+  margin-bottom: 24px;
+}
+
+.results-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.result-item {
+  padding: 14px 6px;
+  border-bottom: 1px solid #ddd;
+
+  h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 6px;
+  }
+
+  p {
+    font-size: 14px;
+    color: #666;
+    margin: 4px 0;
+  }
+}

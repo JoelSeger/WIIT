@@ -6,6 +6,7 @@ import { PublicArchivalSystem } from './pages/public-archival-system/public-arch
 import { ArchiveStructure } from './pages/archive-structure/archive-structure';
 import { StorageUnit } from './pages/storage-unit/storage-unit';
 import { ExportArchive } from './pages/export-archive/export-archive';
+import { SearchResults } from './pages/search-results/search-results';
 
 export const routes: Routes = [
     { path: 'login', component: LoginComponent },
@@ -22,8 +23,9 @@ export const routes: Routes = [
         { path: 'public-archival-system', component: PublicArchivalSystem },
         { path: 'archive-structure', component: ArchiveStructure },
         { path: 'storage-unit', component: StorageUnit },
-        { path: 'export-archive', component: ExportArchive }
+        { path: 'export-archive', component: ExportArchive },
+        { path: 'search', component: SearchResults }
       ]
     },
-    { path: '**', redirectTo: '' }
+        { path: '**', redirectTo: '' }
 ];
