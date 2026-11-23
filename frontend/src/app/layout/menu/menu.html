@@ -15,35 +15,27 @@
         <div class="loading-text">Laddar strukturer...</div>
       } @else if (structureError()) {
         <div class="error-text">Kunde inte ladda strukturer.</div>
-      } @else if (structures().length > 0) {
-        
-        @for (structure of structures(); track structure.id) {
-          <div class="structure-group">
-            
-            <!-- Huvudmappen (Klickbar) -->
-            <div class="structure-header" (click)="toggleStructure(structure.id, $event)">
-              <div class="toggle-container">
-                <!-- Pilen roterar baserat på om mappen är öppen -->
-                <span class="chevron" [class.expanded]="expandedStructures().has(structure.id)">▶</span>
-              </div>
-              <img src="/archive2.png" class="node-icon" alt="" />
-              <span class="node-label">{{ getStructureLabel(structure.structureType) }}</span>
-            </div>
-            
-            <!-- Delmapparna (Visas bara om huvudmappen är öppen) -->
-            @if (expandedStructures().has(structure.id)) {
-              <div class="tree-wrapper">
-                <app-tree-view
-                  [structureId]="structure.id"
-                  (nodeSelected)="onNodeSelected($event)">
-                </app-tree-view>
-              </div>
-            }
-          </div>
+      } @else if (selectedStructureId()) {
+
+        @if (structures().length > 1) {
+          <label class="structure-select">
+            <span>Struktur</span>
+            <select (change)="onStructureChange($event)">
+              @for (s of structures(); track s.id) {
+                <option [value]="s.id" [selected]="s.id === selectedStructureId()">
+                  {{ s.name }} ({{ structureTypeLabel(s.structureType) }})
+                </option>
+              }
+            </select>
+          </label>
         }
 
+        <app-tree-view
+          [structureId]="selectedStructureId()!"
+          (nodeSelected)="onNodeSelected($event)">
+        </app-tree-view>
       } @else {
-        <div class="loading-text">Inga strukturer hittades.</div>
+        <div class="loading-text">Inga publicerade strukturer hittades.</div>
       }
     </div>
 

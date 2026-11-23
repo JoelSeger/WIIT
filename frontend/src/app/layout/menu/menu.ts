@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { TreeView, FlatTreeNode } from '../tree-view/tree-view';
 
+/** Same fields as GET /api/structures returns (backend StructureRepository.findSummaries). */
 export interface StructureSummary {
   id: number;
   code: string;
@@ -28,31 +29,24 @@ export class Menu implements OnInit {
   private startX = 0;
   private startWidth = 0;
 
+  // F4.3 – structures shown in the menu tree
   structures = signal<StructureSummary[]>([]);
-  
-  // Ny signal för att hålla koll på vilka huvudmappar som är öppna
-  expandedStructures = signal<Set<number>>(new Set());
-  
-  selectedNode = signal<FlatTreeNode | null>(null);
+  selectedStructureId = signal<number | null>(null);
+  selectedNode = signal<FlatTreeNode | null>(null); // for the coming detail view
   isLoadingStructures = signal<boolean>(true);
   structureError = signal<boolean>(false);
 
   ngOnInit() {
     this.http.get<{ success: boolean; data: StructureSummary[] }>('/api/structures').subscribe({
       next: (res) => {
+        // The tree uses the public endpoint, which returns 404 for unpublished structures,
+        // so only published structures are offered here.
         const published = (res.data ?? []).filter((s) => !!s.isPublished);
-        
-        // Sortera: Struktur först, sedan Förvaring
-        const sorted = [...published].sort((a, b) => {
-          const order = { 'klassificering': 1, 'forvaring': 2, 'arkivforteckning': 3 };
-          return (order[a.structureType] || 99) - (order[b.structureType] || 99);
-        });
+        this.structures.set(published);
 
-        this.structures.set(sorted);
-        
-        // Öppna alla huvudmappar från start diskutera med gruppen hur man vill göra!
-        //this.expandedStructures.set(new Set(sorted.map(s => s.id)));
-        
+        // Show the classification structure (Struktur) first, otherwise the first one.
+        const klassificering = published.find((s) => s.structureType === 'klassificering');
+        this.selectedStructureId.set(klassificering?.id ?? published[0]?.id ?? null);
         this.isLoadingStructures.set(false);
       },
       error: (err) => {
@@ -63,22 +57,19 @@ export class Menu implements OnInit {
     });
   }
 
-  getStructureLabel(type: string): string {
-    switch (type) {
-      case 'klassificering': return 'Struktur';
-      case 'forvaring': return 'Förvaring';
-      case 'arkivforteckning': return 'Arkivförteckning';
-      default: return type;
-    }
+  onStructureChange(event: Event) {
+    const id = Number((event.target as HTMLSelectElement).value);
+    this.selectedStructureId.set(id);
+    this.selectedNode.set(null);
   }
 
-  // Funktion för att fälla ut/in huvudmapparna
-  toggleStructure(id: number, event: Event): void {
-    event.stopPropagation();
-    const next = new Set(this.expandedStructures());
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    this.expandedStructures.set(next);
+  structureTypeLabel(type: StructureSummary['structureType']): string {
+    switch (type) {
+      case 'klassificering': return 'Struktur';
+      case 'arkivforteckning': return 'Arkivförteckning';
+      case 'forvaring': return 'Förvaring';
+      default: return type;
+    }
   }
 
   toggleMenu(): void {
@@ -107,6 +98,7 @@ export class Menu implements OnInit {
     this.isResizing = false;
   }
 
+  // Clicked node is kept here so the detail view can use it later.
   onNodeSelected(node: FlatTreeNode) {
     this.selectedNode.set(node);
   }
