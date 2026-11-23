@@ -10,7 +10,7 @@ import type { Structure } from "../models/structure/structure";
 import type {
   CreateStructureRequest,
 } from "../types/structureCreation.types";
-import { ConflictError, NotFoundError, ValidationError } from "./errorService";
+import { ConflictError, NotFoundError, ValidationError } from "../helpers/errorService";
 
 export interface CreateStructureResult {
   archiveCreator?: ArchiveCreator;

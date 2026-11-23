@@ -31,7 +31,7 @@ import { ArchiveCreatorRepository } from '../repos/archiveCreatorRepository';
 import { ArchiveRepository } from '../repos/archiveRepository';
 import { ArchiveStructureRepository } from '../repos/archiveStructureRepository';
 import { StructureRepository } from '../repos/structureRepository';
-import { ConflictError, NotFoundError, ValidationError } from '../services/errorService';
+import { ConflictError, NotFoundError, ValidationError } from '../helpers/errorService';
 import { StructureCreationService } from '../services/structureCreatorService';
 
 

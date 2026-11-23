@@ -4,7 +4,7 @@ import type { Node } from "../models/node/node";
 import type { NodePropertyValues } from "../models/node/nodePropertyValues";
 import type { CreateNodeData } from "../types/nodeCreation.types";
 import type { NodeAttributeChanges } from "../types/nodeEdit.types";
-import {NotFoundError} from "../services/errorService";
+import {NotFoundError} from "../helpers/errorService";
 
 export class NodeRepository extends CrudRepository<Node> {
   constructor(knex: Knex, trx?: Knex.Transaction) {
@@ -71,6 +71,20 @@ export class NodeRepository extends CrudRepository<Node> {
   async findById(id: number): Promise<Node | undefined> {
     const row = await this.qb.where({ id }).first();
     return row ? this.mapNode(row) : undefined;
+  }
+
+  /**
+   * Which of `nodeIds` are nodes whose node type has this code (ids that do not exist are left out).
+   * One join query; runs inside the transaction when the repository was created with one.
+   */
+  async filterIdsByNodeTypeCode(nodeIds: number[], nodeTypeCode: string): Promise<number[]> {
+    const db = this.trx ?? this.knex;
+    const rows: { id: number }[] = await db("nodes as n")
+        .join("node_types as t", "t.id", "n.node_type_id")
+        .where("t.code", nodeTypeCode)
+        .whereIn("n.id", nodeIds)
+        .select("n.id");
+    return rows.map((r) => r.id);
   }
 
   async findByStructureId(structureId: number): Promise<Node[]> {

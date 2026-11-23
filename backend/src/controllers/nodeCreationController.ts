@@ -1,9 +1,8 @@
 import type { Request, Response } from "express";
 import { BaseController } from "./baseController";
-import { NodeCreationService, type CreateNodeRequest } from "../services/nodeCreationService";
-import { ValidationError } from "../services/errorService";
+import type { CreateNodeRequest, NodeCreationService } from "../services/nodeCreationService";
+import { ValidationError } from "../helpers/errorService";
 import type { PropertyValueInput } from "../types/node.properties.types";
-import type { Knex } from "knex";
 import { isPositiveInt, optionalDate, optionalString } from "./requestParsers";
 
 /**
@@ -67,11 +66,8 @@ export function parseCreateNodeBody(body: unknown, userId: number | null): Creat
 }
 
 export class NodeCreationController extends BaseController {
-  private readonly service: NodeCreationService;
-
-  constructor(knex: Knex) {
+  constructor(private readonly service: NodeCreationService) {
     super();
-    this.service = new NodeCreationService(knex);
   }
 
   /** POST /api/nodes */

@@ -29,7 +29,7 @@ import type { NodeType } from '../models/node/nodeType';
 import { NodeActivityRepository } from '../repos/nodeActivityRepository';
 import { NodeRepository } from '../repos/nodeRepository';
 import { NodeTypeRepository } from '../repos/nodeTypeRepository';
-import { NotFoundError, ValidationError } from '../services/errorService';
+import { NotFoundError, ValidationError } from '../helpers/errorService';
 import { NodeActivityService } from '../services/nodeActivityService';
 
 
@@ -70,6 +70,10 @@ const makeNodeType = (overrides: Partial<NodeType> = {}): NodeType => ({
     eadUnitDescription: null,
     description: null,
     isActive: true,
+    // Added after Muhammad's changes just to make the code compile Needs to be controlled
+    canBeRoot:true,
+    // Added after Muhammad's changes just to make the code compile Needs to be controlled
+    hasActivities: true,
     ...overrides,
 });
 

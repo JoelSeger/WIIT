@@ -15,7 +15,7 @@ import {
   type PropertyValueInput,
   type TabKey,
 } from "../types/node.properties.types";
-import { NotFoundError, ValidationError } from "../services/errorService";
+import { NotFoundError, ValidationError } from "../helpers/errorService";
 
 interface StoredValue {
   valueText: string | null;

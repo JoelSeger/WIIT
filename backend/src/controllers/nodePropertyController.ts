@@ -1,10 +1,9 @@
 import type { Request, Response } from "express";
-import type { Knex } from "knex";
 import { BaseController } from "./baseController";
-import { NodePropertyService } from "../services/nodePropertyService";
-import { NodeActivityService } from "../services/nodeActivityService";
-import { NodeEditService } from "../services/nodeEditService";
-import { ValidationError } from "../services/errorService";
+import type { NodePropertyService } from "../services/nodePropertyService";
+import type { NodeActivityService } from "../services/nodeActivityService";
+import type { NodeEditService } from "../services/nodeEditService";
+import { ValidationError } from "../helpers/errorService";
 import { isPositiveInt, optionalDate, optionalString } from "./requestParsers";
 import type { ActivityInput, PropertyValueInput } from "../types/node.properties.types";
 import type { EditNodeRequest } from "../types/nodeEdit.types";
@@ -59,23 +58,20 @@ export function parseEditNodeBody(nodeId: unknown, body: unknown, userId: number
   request.expectedRowVersion = parseRowVersion(b.rowVersion);
 
   const touchesSomething =
-    ["title", "referenceCode", "previousReferenceCode", "description", "validFrom", "validTo"].some((k) => has(b, k)) ||
-    (request.properties?.length ?? 0) > 0;
+      ["title", "referenceCode", "previousReferenceCode", "description", "validFrom", "validTo"].some((k) => has(b, k)) ||
+      (request.properties?.length ?? 0) > 0;
   if (!touchesSomething) throw new ValidationError("Nothing to update");
 
   return request;
 }
 
 export class NodePropertyController extends BaseController {
-  private readonly properties: NodePropertyService;
-  private readonly activities: NodeActivityService;
-  private readonly editing: NodeEditService;
-
-  constructor(knex: Knex) {
+  constructor(
+      private readonly properties: NodePropertyService,
+      private readonly activities: NodeActivityService,
+      private readonly editing: NodeEditService,
+  ) {
     super();
-    this.properties = new NodePropertyService(knex);
-    this.activities = new NodeActivityService(knex);
-    this.editing = new NodeEditService(knex);
   }
 
   /**
@@ -114,9 +110,9 @@ export class NodePropertyController extends BaseController {
         }
       });
       this.success(
-        res,
-        await this.properties.saveValues(id, values as PropertyValueInput[], req.user?.id ?? null),
-        "Values saved",
+          res,
+          await this.properties.saveValues(id, values as PropertyValueInput[], req.user?.id ?? null),
+          "Values saved",
       );
     } catch (err: unknown) {
       this.handleError(res, err);
@@ -152,21 +148,21 @@ export class NodePropertyController extends BaseController {
   };
 
   publishUnpublishNode = async (req: Request, res: Response): Promise<void> => {
-      try {
-          const nodeId = this.nodeId(req);
-          const user = req.session.user;
-          if (!user) {
-              this.unauthorized(res);
-              return;
-          }
-          if (!user.id) {
-              this.unauthorized(res);
-              return;
-          }
-          const node = await this.editing.publishUnpublishNode(nodeId, user.id)
-          this.success(res, node)
-      } catch (err: any) {
-          this.handleError(res, err);
+    try {
+      const nodeId = this.nodeId(req);
+      const user = req.session.user;
+      if (!user) {
+        this.unauthorized(res);
+        return;
       }
+      if (!user.id) {
+        this.unauthorized(res);
+        return;
+      }
+      const node = await this.editing.publishUnpublishNode(nodeId, user.id)
+      this.success(res, node)
+    } catch (err: any) {
+      this.handleError(res, err);
+    }
   }
 }

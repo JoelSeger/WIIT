@@ -2,7 +2,7 @@ import type { Knex } from "knex";
 import type { NodeRepository } from "../repos/nodeRepository";
 import { createRepositories, type Repositories } from "../repos/repositories";
 import { NodePropertyService } from "./nodePropertyService";
-import { ConflictError, NotFoundError, ValidationError } from "./errorService";
+import { ConflictError, NotFoundError, ValidationError } from "../helpers/errorService";
 import type { Node } from "../models/node/node";
 import type { NodeForm } from "../types/node.properties.types";
 import type { EditNodeRequest, NodeAttributeChanges } from "../types/nodeEdit.types";
