@@ -1,10 +1,11 @@
-import { Component, inject, output, HostListener, ElementRef, DestroyRef, ChangeDetectorRef } from '@angular/core';
+import { Component, inject, output, HostListener, ElementRef, DestroyRef, ChangeDetectorRef, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LoginService } from '../../core/services/login.service';
 import { SearchService } from '../../services/search.service';
 import { SearchResult } from '../../models/search';
 import { Subject, debounceTime, distinctUntilChanged, switchMap, of, catchError } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { LayoutService } from '../../services/layout.service';
 
 @Component({
   imports: [RouterLink],
@@ -13,9 +14,11 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
   styleUrl: './nav.scss',
   templateUrl: './nav.html',
 })
-export class Nav {
+export class Nav implements OnInit {
 
   loginService = inject(LoginService);
+  layoutService = inject(LayoutService);
+  
   constructor(private elementRef: ElementRef) {}
   
   menuIconUrl: string = '/menu.png';
@@ -46,7 +49,6 @@ export class Nav {
     console.log('Logout button clicked');
   }
 
-
   searchText = '';
   searchSuggestions: SearchResult[] = [];
   searchCompleted: boolean = false;
@@ -56,8 +58,8 @@ export class Nav {
   private destroyRef = inject(DestroyRef);
   private cdr = inject(ChangeDetectorRef);
 
-  // Handles search requests with debounce
   ngOnInit(): void {
+    // Handles search requests with debounce
     this.searchSubject.pipe(
       debounceTime(300),
       distinctUntilChanged(),
@@ -93,7 +95,6 @@ export class Nav {
     this.searchSubject.next(this.searchText.trim());
   }
 
-  
   selectSuggestion(result: SearchResult): void {
     console.log('Selected search result:', result);
     this.searchText = result.title;
@@ -101,11 +102,11 @@ export class Nav {
   }
 
   @HostListener('document:click', ['$event'])
-onDocumentClick(event: MouseEvent): void {
-  const searchElement = this.elementRef.nativeElement.querySelector('.nav-search');
+  onDocumentClick(event: MouseEvent): void {
+    const searchElement = this.elementRef.nativeElement.querySelector('.nav-search');
 
-  if (searchElement && !searchElement.contains(event.target as Node)) {
-    this.searchSuggestions = [];
+    if (searchElement && !searchElement.contains(event.target as Node)) {
+      this.searchSuggestions = [];
+    }
   }
-}
 }

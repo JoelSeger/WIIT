@@ -1,9 +1,9 @@
-import { Component, inject, DestroyRef, ChangeDetectorRef } from '@angular/core';
+import { Component, inject, DestroyRef, ChangeDetectorRef, OnInit, OnDestroy } from '@angular/core'; // <-- Lagt till OnInit, OnDestroy
 import { SearchService } from '../../services/search.service';
 import { SearchResult } from '../../models/search';
 import { Subject, debounceTime, distinctUntilChanged, switchMap, of, catchError } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-
+import { LayoutService } from '../../services/layout.service';
 
 @Component({
   selector: 'app-public-archival-system',
@@ -12,7 +12,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
   templateUrl: './public-archival-system.html',
   styleUrl: './public-archival-system.scss'
 })
-export class PublicArchivalSystem {
+export class PublicArchivalSystem implements OnInit, OnDestroy {
+
+  layoutService = inject(LayoutService);
 
   searchText: string = '';
   searchResults: SearchResult[] = [];
@@ -25,6 +27,9 @@ export class PublicArchivalSystem {
 
   // Handles search requests with debounce
   ngOnInit(): void {
+    this.layoutService.showNavSearch.set(false);
+
+    // Handles search requests with debounce
     this.searchSubject.pipe(
       debounceTime(300),
       distinctUntilChanged(),
@@ -48,7 +53,10 @@ export class PublicArchivalSystem {
     });
   }
 
-  
+  ngOnDestroy(): void {
+    this.layoutService.showNavSearch.set(true);
+  }
+
   onSearch(event: Event): void {
     const input = event.target as HTMLInputElement;
     this.searchText = input.value;
