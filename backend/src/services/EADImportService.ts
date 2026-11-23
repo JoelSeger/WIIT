@@ -1,5 +1,5 @@
 /**
- * NF5: EAD import in three steps – parse (eadParser.ts), map (eadMapper.ts), then either a
+ * NF5: EAD import (EAD3 and RA-EAD) in three steps – parse (eadParser.ts), map (eadMapper.ts), then either a
  * preview or writing to the database (eadImport.ts). Preview and import share the first two
  * steps, so the preview shows exactly what the import would do.
  */
@@ -7,8 +7,8 @@
 import type { Knex } from 'knex';
 import { EadParser } from '../ead/eadParser';
 import { EadMapper } from '../ead/eadMapper';
-import { importEad, findTrees, type ImportResult, type StructureType } from '../ead/eadImport';
-import type { EadIssue, EadMetadata, EadNode, ParsedEad } from '../ead/ead.types';
+import { importEad, findTrees, defaultStructureType, type ImportResult, type StructureType } from '../ead/eadImport';
+import type { EadArchive, EadIssue, EadMetadata, EadNode, ParsedEad } from '../ead/ead.types';
 
 /** The file cannot be imported (bad XML, no EAD root, a node without title …). The route answers 400. */
 export class EadImportValidationError extends Error {
@@ -21,6 +21,8 @@ export class EadImportValidationError extends Error {
 export interface PreviewResult {
   valid: boolean;
   metadata: EadMetadata;
+  /** RA-EAD: the arkiv and arkivbildare named in the file (found or created by the import). */
+  archive: EadArchive | null;
   /** The structures the import would create, with node counts. */
   trees: Array<{ name: string; structureType: StructureType; nodeCount: number }>;
   nodeCount: number;
@@ -46,7 +48,7 @@ export class EadImportService {
     private readonly mapper = new EadMapper(),
   ) {}
 
-  private prepare(xml: string): { metadata: EadMetadata; rootNode: EadNode | null; errors: EadIssue[]; warnings: EadIssue[] } {
+  private prepare(xml: string): { metadata: EadMetadata; rootNode: EadNode | null; archive: EadArchive | null; errors: EadIssue[]; warnings: EadIssue[] } {
     let parsed: ParsedEad;
     try {
       parsed = this.parser.parse(xml);
@@ -65,14 +67,15 @@ export class EadImportService {
    *
    * @throws EadImportValidationError if the file is not well-formed EAD.
    */
-  preview(xml: string, structureType: StructureType = 'klassificering'): PreviewResult {
-    const { metadata, rootNode, errors, warnings } = this.prepare(xml);
+  preview(xml: string, structureType?: StructureType): PreviewResult {
+    const { metadata, rootNode, archive, errors, warnings } = this.prepare(xml);
     const treeWarnings: string[] = [];
-    const trees = rootNode ? findTrees(rootNode, structureType, treeWarnings) : [];
+    const trees = rootNode ? findTrees(rootNode, structureType ?? defaultStructureType(metadata), treeWarnings, metadata.format) : [];
     const sizes = trees.map((t) => t.topNodes.reduce((s, n) => s + count(n), 0));
     return {
       valid: errors.length === 0 && rootNode !== null,
       metadata,
+      archive,
       trees: trees.map((t, i) => ({
         name: t.wrapper?.name || metadata.titleProper || 'Importerad struktur',
         structureType: t.structureType,
@@ -91,10 +94,10 @@ export class EadImportService {
    * @throws EadImportConflictError if the file has already been imported.
    */
   async import(xml: string, options: ImportOptions = {}): Promise<ImportResult> {
-    const { metadata, rootNode, errors, warnings } = this.prepare(xml);
+    const { metadata, rootNode, archive, errors, warnings } = this.prepare(xml);
     if (errors.length > 0 || !rootNode) throw new EadImportValidationError(errors);
 
-    const result = await importEad(this.knex, { metadata, rootNode, ...options });
+    const result = await importEad(this.knex, { metadata, rootNode, archive, ...options });
     return { ...result, warnings: [...warnings.map((w) => w.message), ...result.warnings] };
   }
 }

@@ -31,7 +31,7 @@
  */
 
 exports.seed = async function (knex) {
-  // ---- Clear in dependency order (children before parents) ------------------
+  //  Clear in dependency order (children before parents)
   await knex('transfer_jobs').del();
   await knex('structure_versions').del();
   await knex('change_log').del();
@@ -39,6 +39,8 @@ exports.seed = async function (knex) {
   await knex('node_relations').del();
   await knex('relation_types').del();
   await knex('node_property_values').del();
+  await knex('node_activity_handlingstyp').del();   // NEW: checklist rows point at nodes (NO ACTION)
+  await knex('node_activities').del();               // NEW: activities point at nodes
   await knex('property_options').del();
   await knex('property_definitions').del();
   await knex('archive_structures').del();
@@ -56,7 +58,7 @@ exports.seed = async function (knex) {
     return result.id;
   };
 
-  // ---- Demo user (normally created on first SSO login) ----------------------
+  // Demo user (normally created on first SSO login)
   const admin = await insert('users', {
     ad_object_id: '00000000-0000-0000-0000-000000000001',
     username: 'demo.arkivarie',
@@ -64,7 +66,7 @@ exports.seed = async function (knex) {
   });
   const by = { created_by: admin, updated_by: admin };
 
-  // ---- Arkivbildare and arkiv -------------------------------------------------
+  // Arkivbildare and arkiv
   const mau = await insert('archive_creators', { name: 'Malmö universitet', is_published: true, ...by });
   await insert('archive_creators', {
     name: 'Malmö högskola 1998–2015', start_year: 1998, end_year: 2015, is_published: true,
@@ -74,7 +76,7 @@ exports.seed = async function (knex) {
     archive_creator_id: mau, reference_code: 'MAU-001', name: 'Malmö universitets arkiv', is_published: true, ...by,
   });
 
-  // ---- Structures: one per top tree -------------------------------------------------
+  // Structures: one per top tree
   const org = { agency_code: 'SE-MAU', agency_name: 'Malmö universitet, Arkivfunktionen', license: 'CC0' };
   const ihp = await insert('structures', {
     code: 'ihp', name: 'Informationshanteringsplan', structure_type: 'klassificering',
@@ -90,21 +92,23 @@ exports.seed = async function (knex) {
     { archive_id: arkivMau, structure_id: forv, created_by: admin },
   ]);
 
-  // ---- Node types -------------------------------------------------------------
-  const t = (code, name, structure_type, ead_level, ead_otherlevel, ead_unit_description) =>
-    insert('node_types', { code, name, structure_type, ead_level, ead_otherlevel, ead_unit_description });
+  // Node types
+  // flags (migration 012): { can_be_root: true } = may be the top node of a structure,
+  //                        { has_activities: true } = has the Aktiviteter tab
+  const t = (code, name, structure_type, ead_level, ead_otherlevel, ead_unit_description, flags = {}) =>
+    insert('node_types', { code, name, structure_type, ead_level, ead_otherlevel, ead_unit_description, ...flags });
 
   // Struktur (RA-FS 2008:4 / FGS): verksamhetsområde → processgrupp → process → HS → HT
   // Klara exports all three as otherlevel="structuralunit" and tells them apart with
   // <didnote localtype="structuralunitdescription">, so the import can only find them this way.
   const su = 'structuralunit';
-  const omrade  = await t('verksamhetsomrade', 'Verksamhetsområde', 'klassificering', 'otherlevel', su, 'Verksamhetsområde');
+  const omrade  = await t('verksamhetsomrade', 'Verksamhetsområde', 'klassificering', 'otherlevel', su, 'Verksamhetsområde', { can_be_root: true });
   const pgrupp  = await t('processgrupp',      'Processgrupp',      'klassificering', 'otherlevel', su, 'Processgrupp');
-  const process = await t('process',           'Process',           'klassificering', 'otherlevel', su, 'Process');
+  const process = await t('process',           'Process',           'klassificering', 'otherlevel', su, 'Process', { has_activities: true });
   const hslag   = await t('handlingsslag',     'Handlingsslag',     'klassificering', 'otherlevel', 'recordgroup');
   const htyp    = await t('handlingstyp',      'Handlingstyp',      'klassificering', 'otherlevel', 'recordtype');
   // Förvaring – @otherlevel values as in Klara's export
-  const enhet   = await t('strukturenhet',     'Strukturenhet',     'forvaring', 'otherlevel', 'Strukturenhet');
+  const enhet   = await t('strukturenhet',     'Strukturenhet',     'forvaring', 'otherlevel', 'Strukturenhet', undefined, { can_be_root: true });
   const system  = await t('verksamhetssystem', 'Verksamhetssystem', 'forvaring', 'otherlevel', 'Verksamhetssystem');
   const svit    = await t('svit',              'Svit',              'forvaring', 'otherlevel', 'Svit');
   const box     = await t('arkivbox',          'Arkivbox',          'forvaring', 'otherlevel', 'Arkivbox');
@@ -120,7 +124,7 @@ exports.seed = async function (knex) {
     { parent_type_id: svit,    child_type_id: box },
   ]);
 
-  // ---- Property definitions ----------------------------------------------------
+  // Property definitions
   const pd = (row) => insert('property_definitions', row);
   const pAnsv = await pd({ node_type_id: process, key: 'ansvarig', label: 'Ansvarig roll', data_type: 'text', ead_element: null, sort_order: 1 });
 
@@ -143,7 +147,7 @@ exports.seed = async function (knex) {
   const bPlac = await pd({ node_type_id: box,  key: 'placering',  label: 'Placering',  data_type: 'text', ead_element: 'did/physloc',  sort_order: 1, is_public: false,
     help_text: 'Var boxen står, t.ex. arkivlokal och hylla.' });
 
-  // ---- Helpers ------------------------------------------------------------------
+  //Helpers
   const n = (row) => insert('nodes', { is_published: true, ...by, ...row });
   const vals = (rows) => knex('node_property_values').insert(rows.map((r) => ({ updated_by: admin, ...r })));
   let order = 0;
@@ -151,7 +155,7 @@ exports.seed = async function (knex) {
   const under = (parent, type, code, title, extra = {}) =>
     n({ structure_id: ihp, parent_id: parent, node_type_id: type, reference_code: code, title, ...extra });
 
-  // ---- Struktur: Informationshanteringsplan (level names from Klara) --------------------
+  //Struktur: Informationshanteringsplan (level names from Klara)
   const v1 = await top('1', 'Leda verksamhet');
   const v2 = await top('2', 'Stödja verksamhet');
   const v3 = await top('3', 'Bedriva utbildning');
@@ -192,7 +196,7 @@ exports.seed = async function (knex) {
     { node_id: budget,  property_definition_id: hDiar,  value_boolean: false },
   ]);
 
-  // ---- Förvaring (as the recordkeepingentity tree in Klara's export) -------------------
+  // Förvaring (as the recordkeepingentity tree in Klara's export)
   const f = (parent, type, code, title, extra = {}) =>
     n({ structure_id: forv, parent_id: parent, node_type_id: type, reference_code: code, title, ...extra });
   const vs = await f(null, enhet, null, 'Verksamhetssystem');
@@ -209,7 +213,7 @@ exports.seed = async function (knex) {
     { node_id: box1,  property_definition_id: bPlac, value_text: 'Arkivlokal, hylla 3' },
   ]);
 
-  // ---- Relations between the trees ---------------------------------------------------
+  //  Relations between the trees
   await insert('relation_types', { code: 'forvaras_i', name: 'förvaras i', inverse_name: 'innehåller', ead_element: 'physloc' });
   const redovisas = await insert('relation_types', { code: 'redovisas_under', name: 'redovisas under', inverse_name: 'redovisar', ead_element: 'odd' });
   // Klara's <unitid localtype="relations"><ref target="…">, e.g. handlingstyp → verksamhetssystem.
@@ -219,7 +223,7 @@ exports.seed = async function (knex) {
     { relation_type_id: redovisas, from_node_id: svit1, to_node_id: ansokan, created_by: admin },
   ]);
 
-  // ---- Permissions (AD group names are placeholders) ------------------------------------
+  //Permissions (AD group names are placeholders)
   await knex('ad_group_roles').insert([
     { ad_group: 'MAU-Arkivfunktionen', role: 'admin',  structure_id: null },
     { ad_group: 'MAU-Registratorer',   role: 'editor', structure_id: forv },

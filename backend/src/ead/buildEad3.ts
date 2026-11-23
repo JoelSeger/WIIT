@@ -6,6 +6,7 @@
  * ───────────────────────────────────────────────────────────────────────────────
  *  structures.name / code / agency_*      <control> (recordid, titleproper, maintenanceagency)
  *  structures.version                     <control><filedesc><editionstmt><edition>
+ *  one top node of level fonds (Arkiv)    <archdesc level="fonds"> = that node, its children in <dsc>
  *  archives (via archive_structures)      <archdesc level="fonds">, all top nodes in <dsc>
  *  archive_creators                       <did><origination><corpname|persname|famname>
  *  archive_creators.description           <bioghist>
@@ -68,7 +69,19 @@ export function buildEad3(
   const control = buildControl(structure, generatedAt, generator, publicOnly);
 
   let archdesc: XmlElement;
-  if (loaded.archive) {
+  const fondsRoot = roots.length === 1 && roots[0]!.type.ead_level === 'fonds' ? roots[0]! : null;
+  if (fondsRoot) {
+    // The tree starts with an Arkiv node (imported RA-EAD: Arkiv / Serie / Volym). That node is
+    // the fonds; the arkivbildare comes from the archive the structure is linked to.
+    const did = buildDid(fondsRoot);
+    const creator = loaded.archive?.creator;
+    if (creator && Array.isArray(did.content)) did.content.push(buildOrigination(creator));
+    archdesc = el('archdesc', { level: 'fonds' }, [
+      did,
+      ...buildBlocks(fondsRoot),
+      fondsRoot.children.length > 0 && el('dsc', {}, fondsRoot.children.map(buildC)),
+    ]);
+  } else if (loaded.archive) {
     // The structure belongs to an archive: the archive is the fonds, all top nodes go below it
     const a = loaded.archive;
     archdesc = el('archdesc', { level: 'fonds' }, [

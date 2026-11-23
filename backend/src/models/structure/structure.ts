@@ -1,20 +1,22 @@
+// camelCase: knex-stringcase maps snake_case columns to these names on read and write.
 export interface Structure {
   id: number;
   code: string;
   name: string;
-  structureType: string;
-  description?: string;
-  validFrom?: Date;
-  validTo?: Date;
+  structureType: "klassificering" | "arkivforteckning" | "forvaring";
+  description: string | null;
+  validFrom: Date | null;
+  validTo: Date | null;
   isPublished: boolean;
-  createdAt: Date;
-  createdBy: number;
-  updatedAt?: Date;
-  updatedBy?: number;
-  agencyCode?: string;
-  agencyName?: string;
+  agencyCode: string | null;
+  agencyName: string | null;
   languageCode: string;
-  license?: string;
-  version?: string;
-  previousStructureId?: number;
+  license: string | null;
+  version: string | null;
+  previousStructureId: number | null;
+  externalId: string | null;
+  createdAt?: Date;
+  createdBy?: number | null;
+  updatedAt?: Date;
+  updatedBy?: number | null;
 }

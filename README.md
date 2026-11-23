@@ -40,13 +40,9 @@ The first start can take a minute while SQL Server boots.
 
 P.S. to stop the database: `docker compose down`
 
-## 4. Test the database connection
-bash: 
-node db-test.js
-
-## 5. Start the backend
+## 4. Start the backend
 bash:
-node server.js
+npm run dev
 
 
 

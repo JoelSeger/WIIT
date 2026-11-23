@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Hand-written test file in the same shape as Riksarkivet's RA-EAD exports (GV.ead / LS.ead). No real archive data. -->
+<ead xmlns="http://xml.ra.se/EAD" xmlns:xlink="http://xml.ra.se/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://xml.ra.se/EAD http://xml.ra.se/EAD/RA_EAD.xsd">
+  <eadheader>
+    <eadid mainagencycode="-">77</eadid>
+    <filedesc>
+      <titlestmt>
+        <titleproper>Testförvaltningen 2001 - 2010</titleproper>
+      </titlestmt>
+    </filedesc>
+    <revisiondesc>
+      <change>
+        <date>2010-01-31</date>
+        <item/>
+      </change>
+    </revisiondesc>
+  </eadheader>
+  <archdesc level="fonds">
+    <did>
+      <unitid/>
+      <unittitle>Testförvaltningen 2001 - 2010</unittitle>
+      <origination>
+        <corpname authfilenumber="/77" role="arkivbildare">Testhögskolan 2001-2010</corpname>
+      </origination>
+    </did>
+    <custodhist>
+      <p>Historik för
+Testförvaltningen.
+
+Förteckning upprättad som testdata.</p>
+    </custodhist>
+    <odd>
+      <p>Arkivbildaren bytte namn 2005.</p>
+    </odd>
+    <dsc type="in-depth">
+      <c level="series">
+        <did>
+          <unitid>A1</unitid>
+          <unittitle label="Styrelsens protokoll 2001-2010.">Styrelsens protokoll</unittitle>
+          <unitdate>2001 -- 2010</unitdate>
+          <physdesc>
+            <extent unit="vol.">3</extent>
+          </physdesc>
+          <physloc type="Ja">Källaren 15</physloc>
+        </did>
+        <odd>
+          <p>Serien i arkivboxar. Serien avslutad.</p>
+        </odd>
+        <c level="otherlevel" otherlevel="volym">
+          <did>
+            <unitid>1</unitid>
+            <unitdate>2001</unitdate>
+            <physloc type="Ja">Källaren</physloc>
+          </did>
+          <odd>
+            <p>Januari - juni.</p>
+          </odd>
+        </c>
+        <c level="otherlevel" otherlevel="volym">
+          <did>
+            <unitid>2</unitid>
+            <unitdate>2002--2009</unitdate>
+          </did>
+          <odd>
+            <p>Protokoll &amp; bilagor.</p>
+            <p>Bilaga 3 saknas.&#13;
+Se volym 0.a.</p>
+          </odd>
+        </c>
+        <c level="otherlevel" otherlevel="volym">
+          <did>
+            <unitid>0.a</unitid>
+            <unitdate>2010-</unitdate>
+          </did>
+          <odd>
+            <p/>
+          </odd>
+        </c>
+      </c>
+      <c level="series">
+        <did>
+          <unitid>F2CC</unitid>
+          <unittitle label="Kursdossiéer">Kursdossiéer</unittitle>
+          <physdesc>
+            <extent unit="vol.">1</extent>
+          </physdesc>
+        </did>
+        <c level="otherlevel" otherlevel="volym">
+          <did>
+            <unitid>1</unitid>
+            <unitdate>2003</unitdate>
+          </did>
+          <odd>
+            <p/>
+          </odd>
+        </c>
+      </c>
+    </dsc>
+  </archdesc>
+</ead>
