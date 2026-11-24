@@ -3,6 +3,8 @@ name: Backend CI
 on:
   push:
     branches: [ develop ]
+  pull_request:
+    branches: [ develop ]
 
 permissions:
   contents: write   # needed to commit the dated test summary back to develop
@@ -62,7 +64,7 @@ jobs:
 
       # Keep only the dated .md summary in the repo (XML is discarded)
       - name: Commit dated test summary to develop
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
