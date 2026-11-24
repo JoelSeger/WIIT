@@ -1,0 +1,49 @@
+
+<div class="search-results-page">
+
+  <h1>Sökresultat</h1>
+
+  <!-- Shows the total number of search results -->
+  <p class="results-count">
+    {{ totalResults }} träffar för "{{ searchText }}"
+  </p>
+
+  <!-- Displays the search results -->
+  <div class="results-list">
+    @for (result of searchResults; track result.nodeId) {
+      <div class="result-item">
+        <h3>{{ result.title }}</h3>
+
+        <p>{{ result.nodeType.name }}</p>
+        <p>{{ result.structureName }}</p>
+      </div>
+    } @empty {
+      <p>Inga sökresultat hittades.</p>
+    }
+  </div>
+
+<!-- Pagination -->
+@if (totalResults > pageSize) {
+  <div class="pagination">
+    <span>Sida {{ currentPage }} av {{ totalPages }}</span>
+
+    <button
+      type="button"
+      [disabled]="currentPage === 1"
+      (click)="changePage(currentPage - 1)"
+    >
+      Föregående
+    </button>
+
+    <button
+      type="button"
+      [disabled]="currentPage === totalPages"
+      (click)="changePage(currentPage + 1)"
+    >
+      Nästa
+    </button>
+  </div>
+}
+
+
+</div>
