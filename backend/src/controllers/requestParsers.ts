@@ -1,4 +1,4 @@
-import { ValidationError } from "../services/errorService";
+import { ValidationError } from "../helpers/errorService";
 
 /** Small helpers for validating request bodies. Shared by the node controllers. */
 

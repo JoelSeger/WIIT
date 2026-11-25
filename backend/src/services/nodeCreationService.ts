@@ -3,7 +3,7 @@ import { createRepositories, type Repositories } from "../repos/repositories";
 import type { Node } from "../models/node/node";
 import type { PropertyValueInput } from "../types/node.properties.types";
 import { NodePropertyService } from "./nodePropertyService";
-import { ConflictError, NotFoundError, ValidationError } from "./errorService";
+import { ConflictError, NotFoundError, ValidationError } from "../helpers/errorService";
 
 export interface CreateNodeRequest {
   structureId: number;

@@ -1,7 +1,7 @@
 import type { Knex } from "knex";
 import { createRepositories, type Repositories } from "../repos/repositories";
 import type { ActivityDto, ActivityInput } from "../types/node.properties.types";
-import { NotFoundError, ValidationError } from "./errorService";
+import { NotFoundError, ValidationError } from "../helpers/errorService";
 
 /*
  * Which node types have the Aktiviteter tab is data: node_types.has_activities (migration 012).
@@ -21,8 +21,8 @@ export type NodeActivityRepos = Pick<Repositories, "nodes" | "nodeTypes" | "node
 
 export class NodeActivityService {
   constructor(
-    private readonly knex: Knex,
-    private readonly repos: NodeActivityRepos = createRepositories(knex),
+      private readonly knex: Knex,
+      private readonly repos: NodeActivityRepos = createRepositories(knex),
   ) {}
 
   async list(nodeId: number): Promise<ActivityDto[]> {
@@ -61,15 +61,11 @@ export class NodeActivityService {
       // one (process - HT), so the tree can change shape without this check breaking.
       const wanted = [...new Set(inputs.flatMap((a) => a.handlingstypNodeIds ?? []))];
       if (wanted.length > 0) {
-        const ofRightType: { id: number }[] = await trx("nodes as n")
-          .join("node_types as t", "t.id", "n.node_type_id")
-          .where("t.code", CHECKLIST_NODE_TYPE)
-          .whereIn("n.id", wanted)
-          .select("n.id");
-        const below = await nodes.filterDescendantsOf(nodeId, ofRightType.map((r) => r.id));
+        const ofRightType = await nodes.filterIdsByNodeTypeCode(wanted, CHECKLIST_NODE_TYPE);
+        const below = await nodes.filterDescendantsOf(nodeId, ofRightType);
         if (below.size !== wanted.length) {
           throw new ValidationError(
-            `The checklist may only contain ${CHECKLIST_NODE_TYPE} nodes that belong to this node`,
+              `The checklist may only contain ${CHECKLIST_NODE_TYPE} nodes that belong to this node`,
           );
         }
       }
@@ -77,11 +73,7 @@ export class NodeActivityService {
       // Every strukturenhet reference must be a node of type 'strukturenhet'.
       const units = [...new Set(inputs.map((a) => a.structureUnitNodeId).filter((id): id is number => !!id))];
       if (units.length > 0) {
-        const found = await trx("nodes as n")
-          .join("node_types as t", "t.id", "n.node_type_id")
-          .where("t.code", STRUCTURE_UNIT_NODE_TYPE)
-          .whereIn("n.id", units)
-          .select("n.id");
+        const found = await nodes.filterIdsByNodeTypeCode(units, STRUCTURE_UNIT_NODE_TYPE);
         if (found.length !== units.length) {
           throw new ValidationError(`structureUnitNodeId must be a ${STRUCTURE_UNIT_NODE_TYPE} node`);
         }

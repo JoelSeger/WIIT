@@ -1,8 +1,7 @@
 import type { Request, Response } from "express";
-import type { Knex } from "knex";
 import { BaseController } from "./baseController";
-import { NodeDeleteService } from "../services/nodeDeleteService";
-import { ValidationError } from "../services/errorService";
+import type { NodeDeleteService } from "../services/nodeDeleteService";
+import { ValidationError } from "../helpers/errorService";
 import { isPositiveInt } from "./requestParsers";
 import type { DeleteNodeRequest } from "../types/nodeDelete.types";
 
@@ -14,11 +13,8 @@ export function parseDeleteNodeRequest(rawId: unknown, userId: number | null): D
 }
 
 export class NodeDeleteController extends BaseController {
-  private readonly service: NodeDeleteService;
-
-  constructor(knex: Knex) {
+  constructor(private readonly service: NodeDeleteService) {
     super();
-    this.service = new NodeDeleteService(knex);
   }
 
   /** DELETE /api/nodes/:id   (F3.1) – only a node without children can be deleted. */

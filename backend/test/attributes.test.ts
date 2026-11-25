@@ -10,7 +10,7 @@ import { NodePropertyService } from "../src/services/nodePropertyService";
 import { NodeActivityService } from "../src/services/nodeActivityService";
 import { NodeCreationService } from "../src/services/nodeCreationService";
 import { parseCreateNodeBody } from "../src/controllers/nodeCreationController";
-import { ConflictError, NotFoundError, ValidationError } from "../src/services/errorService";
+import { ConflictError, NotFoundError, ValidationError } from "../src/helpers/errorService";
 
 async function main() {
   const db = knexLib({

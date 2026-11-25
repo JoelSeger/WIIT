@@ -1,6 +1,6 @@
 import type { Response, Request } from 'express';
 import logger from '../config/logger';
-import { ServiceError, ValidationError, isUniqueViolation } from '../services/errorService';
+import { ServiceError, ValidationError, isUniqueViolation } from '../helpers/errorService';
 
 /**
  * The base controller all other controllers extend. Every endpoint answers with the same shape:

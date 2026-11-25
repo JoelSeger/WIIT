@@ -27,8 +27,7 @@ import type { NodeRepository } from '../repos/nodeRepository';
 import type { NodeTypeRepository } from '../repos/nodeTypeRepository';
 import type { PropertyDefinitionRepository } from '../repos/propertyDefinitionRepository';
 import type { StructureRepository } from '../repos/structureRepository';
-import { NodeService } from '../services/nodeService';
-
+import { NodeTreeService } from '../services/nodeTreeService';
 
 // setup for the tests
 
@@ -83,8 +82,9 @@ const makeNodeType = (overrides: Partial<NodeType> = {}): NodeType => ({
     eadUnitDescription: null,
     description: null,
     isActive: true,
+    canBeRoot: false,
+    hasActivities: false,
     ...overrides,
-
 });
 
 const makeDefinition = (overrides: Partial<PropertyDefinition> = {}): PropertyDefinition => ({
@@ -119,12 +119,12 @@ const makeValue = (overrides: Partial<NodePropertyValues> = {}): NodePropertyVal
 // The Tests
 // ──────────────────────────────────────
 
-describe('NodeService', () => {
+describe('NodeTreeService', () => {
     let nodes: jest.Mocked<NodeRepository>;
     let nodeTypes: jest.Mocked<NodeTypeRepository>;
     let definitions: jest.Mocked<PropertyDefinitionRepository>;
     let structures: jest.Mocked<StructureRepository>;
-    let service: NodeService;
+    let service: NodeTreeService;
 
     beforeEach(() => {
         nodes = {
@@ -140,7 +140,12 @@ describe('NodeService', () => {
         nodes.findValuesByStructure.mockResolvedValue([]);
         definitions.findByIds.mockResolvedValue([]);
 
-        service = new NodeService(nodes, nodeTypes, definitions, structures);
+        service = new NodeTreeService(
+            nodes,
+            nodeTypes,
+            definitions,
+            structures
+        );
     });
 
 

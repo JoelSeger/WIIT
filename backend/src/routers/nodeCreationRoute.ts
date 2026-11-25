@@ -3,15 +3,24 @@ import type { Knex } from "knex";
 import { NodeCreationController } from "../controllers/nodeCreationController";
 import { NodePropertyController } from "../controllers/nodePropertyController";
 import { NodeDeleteController } from "../controllers/nodeDeleteController";
+import { NodeCreationService } from "../services/nodeCreationService";
+import { NodeDeleteService } from "../services/nodeDeleteService";
+import { NodePropertyService } from "../services/nodePropertyService";
+import { NodeActivityService } from "../services/nodeActivityService";
+import { NodeEditService } from "../services/nodeEditService";
 import { requireRole } from "../middleware/auth";
 
 
 export function createNodeCreationRouter(knex: Knex): Router {
   const router = Router();
 
-  const creation = new NodeCreationController(knex);
-  const properties = new NodePropertyController(knex);
-  const deletion = new NodeDeleteController(knex);
+  const creation = new NodeCreationController(new NodeCreationService(knex));
+  const properties = new NodePropertyController(
+      new NodePropertyService(knex),
+      new NodeActivityService(knex),
+      new NodeEditService(knex),
+  );
+  const deletion = new NodeDeleteController(new NodeDeleteService(knex));
 
   // Creating and editing nodes is restricted to editors.
   router.post("/", requireRole("editor"), creation.createNode);
@@ -24,7 +33,7 @@ export function createNodeCreationRouter(knex: Knex): Router {
 
   router.get("/:id/form", requireRole("editor"), properties.getForm);
   router.get("/:id/activities", requireRole("editor"), properties.getActivities);
-    // Can be created on a process
+  // Can be created on a process
   router.put("/:id/activities", requireRole("editor"), properties.saveActivities);
   router.put("/:id/publish", requireRole("editor"), properties.publishUnpublishNode)
 

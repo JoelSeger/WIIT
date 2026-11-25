@@ -1,6 +1,6 @@
 import type { Knex } from "knex";
 import { createRepositories, type Repositories } from "../repos/repositories";
-import { ConflictError, NotFoundError, isForeignKeyViolation } from "./errorService";
+import { ConflictError, NotFoundError, isForeignKeyViolation } from "../helpers/errorService";
 import type { DeleteNodeRequest, DeletedNode } from "../types/nodeDelete.types";
 import { ChangeLogRepository } from "../repos/changeLogRepository";
 
