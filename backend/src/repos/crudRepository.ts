@@ -23,7 +23,7 @@ export abstract class CrudRepository<T>
     public readonly tableName: string,
   ) {}
 
-  get qb() { return this.knex(this.tableName); } // Always use this when accessing the DB!!
+  protected get qb(): Knex.QueryBuilder { return this.knex(this.tableName); } // Always use this when accessing the DB!!
 
   async find(item: Partial<T>): Promise<T[]> {
     return this.qb.where(item).select() as Promise<T[]>;

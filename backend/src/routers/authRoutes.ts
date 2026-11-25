@@ -18,7 +18,7 @@ export function devLoginAllowed(): boolean {
 export function createAuthRouter(db: Knex): Router {
   const router = Router();
   const controller = new AuthController(
-    new AuthService(new UserRepository(db, "users"), new AdGroupRoleRepository(db)),
+    new AuthService(new UserRepository(db), new AdGroupRoleRepository(db)),
   );
 
   if (devLoginAllowed()) {

@@ -7,7 +7,7 @@ import { Knex } from 'knex';
 export function createUserRouter(db: Knex): Router {
   const router = Router();
 
-  const userRepository = new UserRepository(db, 'users');
+  const userRepository = new UserRepository(db);
   const userService = new UserService(userRepository);
   const userController = new UserController(userService);
 

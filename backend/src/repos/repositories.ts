@@ -14,6 +14,9 @@ import { UserRepository } from "./userRepository";
 import { AdGroupRoleRepository } from "./adGroupRoleRepository";
 import { SearchRepository } from "./searchRepository";
 
+
+// This is currently a very cheap to run but if we ever increase the amout of repos substantionally,
+// this could be improved by simple lazy loading the repos. But this can be changed later.
 const registry = {
   nodes: NodeRepository,
   nodeTypes: NodeTypeRepository,

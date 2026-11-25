@@ -22,9 +22,9 @@ export class NodeRepository extends CrudRepository<Node> {
 
   /** All property values of one structure in a single query (a join, so no huge IN list on MSSQL). */
   async findValuesByStructure(structureId: number): Promise<NodePropertyValues[]> {
-    return this.knex("node_property_values as v")
-      .join("nodes as n", "n.id", "v.node_id")
-      .where("n.structure_id", structureId)
+    return this.qb
+      .join("node_property_values as v", "v.node_id", "nodes.id")
+      .where("nodes.structure_id", structureId)
       .select("v.*");
   }
 
