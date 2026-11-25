@@ -89,7 +89,7 @@ export class NodeEditService {
   async publishUnpublishNode(nodeId: number, userId: number): Promise<Node> {
      return await this.knex.transaction(async (trx) => {
        const newNode = await this.repos.nodes(trx).flipPublished(nodeId);
-       this.repos.changeLog(trx).record({
+       await this.repos.changeLog(trx).record({
          entityType: "node",
          entityId: newNode.id,
          structureId: newNode.structureId,
