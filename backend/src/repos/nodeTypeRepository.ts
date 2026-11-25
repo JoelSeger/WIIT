@@ -9,12 +9,12 @@ export class NodeTypeRepository extends CrudRepository<NodeType> {
 
   async findByIds(ids: number[]): Promise<NodeType[]> {
     if (ids.length === 0) return [];
-    return this.qb.whereIn("id", ids);
+    return this.qb().whereIn("id", ids);
   }
 
   // knex-stringcase returns camelCase column names, so the row keys are camelCase too.
   async findByCode(code: string): Promise<NodeType | undefined> {
-    const row = await this.qb
+    const row = await this.qb()
       .where({ code, is_active: true })
       .first();
 
@@ -36,9 +36,7 @@ export class NodeTypeRepository extends CrudRepository<NodeType> {
   }
 
   async isAllowedChild(parentTypeId: number, childTypeId: number): Promise<boolean> {
-    const db = this.trx ?? this.knex;
-
-    const rule = await db("node_type_rules")
+    const rule = await this.qb("node_type_rules")
       .where({
         parent_type_id: parentTypeId,
         child_type_id: childTypeId,

@@ -9,6 +9,6 @@ export class ArchiveRepository extends CrudRepository<Archive> {
   }
 
   async findById(id: number): Promise<Archive | undefined> {
-    return this.qb.where({ id }).first();
+    return this.qb().where({ id }).first();
   }
 }

@@ -8,6 +8,7 @@ import { ValidationError } from "../services/errorService";
 import { isPositiveInt, optionalDate, optionalString } from "./requestParsers";
 import type { ActivityInput, PropertyValueInput } from "../types/node.properties.types";
 import type { EditNodeRequest } from "../types/nodeEdit.types";
+import { UnitOfWork } from "../config/db";
 
 const has = (b: Record<string, unknown>, key: string): boolean => b[key] !== undefined;
 
@@ -67,16 +68,11 @@ export function parseEditNodeBody(nodeId: unknown, body: unknown, userId: number
 }
 
 export class NodePropertyController extends BaseController {
-  private readonly properties: NodePropertyService;
-  private readonly activities: NodeActivityService;
-  private readonly editing: NodeEditService;
-
-  constructor(knex: Knex) {
-    super();
-    this.properties = new NodePropertyService(knex);
-    this.activities = new NodeActivityService(knex);
-    this.editing = new NodeEditService(knex);
-  }
+  constructor(
+    private readonly properties: NodePropertyService,
+    private readonly activities: NodeActivityService,
+    private readonly editing: NodeEditService
+  ) { super(); }
 
   /**
    * PATCH /api/nodes/:id   (F3.2)

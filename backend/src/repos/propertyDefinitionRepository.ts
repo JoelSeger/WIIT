@@ -10,12 +10,12 @@ export class PropertyDefinitionRepository extends CrudRepository<PropertyDefinit
 
   async findByIds(ids: number[]): Promise<PropertyDefinition[]> {
     if (ids.length === 0) return [];
-    return this.qb.whereIn("id", ids);
+    return this.qb().whereIn("id", ids);
   }
 
   /** The active fields of one node type, in display order. */
   async findActiveByNodeType(nodeTypeId: number): Promise<PropertyDefinition[]> {
-    return this.qb
+    return this.qb()
       .where({ nodeTypeId, isActive: true })
       .orderBy("sortOrder", "asc")
       .orderBy("id", "asc");
@@ -24,8 +24,7 @@ export class PropertyDefinitionRepository extends CrudRepository<PropertyDefinit
   /** The active choices of the given enum fields. */
   async findActiveOptions(definitionIds: number[]): Promise<PropertyOption[]> {
     if (definitionIds.length === 0) return [];
-    const db = this.trx ?? this.knex;
-    return db("property_options")
+    return this.qb("property_options")
       .whereIn("propertyDefinitionId", definitionIds)
       .where({ isActive: true })
       .orderBy("sortOrder", "asc");

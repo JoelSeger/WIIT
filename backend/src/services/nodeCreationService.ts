@@ -1,9 +1,9 @@
-import type { Knex } from "knex";
-import { createRepositories, type Repositories } from "../repos/repositories";
 import type { Node } from "../models/node/node";
 import type { PropertyValueInput } from "../types/node.properties.types";
 import { NodePropertyService } from "./nodePropertyService";
 import { ConflictError, NotFoundError, ValidationError } from "./errorService";
+import { UnitOfWork } from "../config/db";
+import { NodeEditProperties } from "./nodeEditService";
 
 export interface CreateNodeRequest {
   structureId: number;
@@ -21,27 +21,15 @@ export interface CreateNodeRequest {
   createdBy: number | null;
 }
 
-export type NodeCreationRepos = Pick<Repositories, "nodes" | "nodeTypes" | "structures">;
-
-/** Only what this service calls on NodePropertyService – easy to fake in a test. */
-export type NodeCreationProperties = Pick<NodePropertyService, "saveValuesInTransaction">;
-
 export class NodeCreationService {
-  constructor(
-    private readonly knex: Knex,
-    private readonly repos: NodeCreationRepos = createRepositories(knex),
-    private readonly properties: NodeCreationProperties = new NodePropertyService(knex),
-  ) {}
+  constructor(private readonly uow: UnitOfWork, private readonly properties: NodeEditProperties = new NodePropertyService(uow)) {}
 
   async createNode(data: CreateNodeRequest): Promise<Node> {
-    return this.knex.transaction(async (trx) => {
-      const structure = await this.repos.structures(trx).findById(data.structureId);
+    return this.uow.run(async (repos) => {
+      const structure = await repos.structures.findById(data.structureId);
       if (!structure) throw new NotFoundError(`Structure ${data.structureId} was not found`);
 
-      const nodeTypeRepository = this.repos.nodeTypes(trx);
-      const nodeRepository = this.repos.nodes(trx);
-
-      const childType = await nodeTypeRepository.findByCode(data.nodeTypeCode);
+      const childType = await repos.nodeTypes.findByCode(data.nodeTypeCode);
       if (!childType) {
         throw new ValidationError(`Node type '${data.nodeTypeCode}' does not exist or is inactive`);
       }
@@ -63,19 +51,19 @@ export class NodeCreationService {
           );
         }
       } else {
-        const parent = await nodeRepository.findById(data.parentId);
+        const parent = await repos.nodes.findById(data.parentId);
         if (!parent) throw new NotFoundError(`Parent node ${data.parentId} was not found`);
         if (parent.structureId !== data.structureId) {
           throw new ValidationError("Parent node must belong to the same structure");
         }
-        const isAllowed = await nodeTypeRepository.isAllowedChild(parent.nodeTypeId, childType.id);
+        const isAllowed = await repos.nodeTypes.isAllowedChild(parent.nodeTypeId, childType.id);
         if (!isAllowed) {
           throw new ValidationError(`Node type '${data.nodeTypeCode}' is not allowed under this parent`);
         }
       }
 
       if (data.referenceCode) {
-        const exists = await nodeRepository.existsByStructureParentAndReferenceCode(
+        const exists = await repos.nodes.existsByStructureParentAndReferenceCode(
           data.structureId,
           data.parentId,
           data.referenceCode,
@@ -87,7 +75,7 @@ export class NodeCreationService {
         }
       }
 
-      const node = await nodeRepository.createNode({
+      const node = await repos.nodes.createNode({
         structureId: data.structureId,
         parentId: data.parentId,
         nodeTypeId: childType.id,
@@ -103,7 +91,7 @@ export class NodeCreationService {
 
       // Attribute values in the same transaction: an invalid value means no node either.
       await this.properties.saveValuesInTransaction(
-        trx,
+        repos,
         node,
         data.properties,
         data.createdBy,

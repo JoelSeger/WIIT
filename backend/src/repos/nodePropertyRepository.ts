@@ -8,7 +8,7 @@ export class NodePropertyRepository extends CrudRepository<NodePropertyValues> {
   }
 
   async findByNodeId(nodeId: number): Promise<NodePropertyValues[]> {
-    return this.qb
+    return this.qb()
       .where({ nodeId })
       .orderBy("propertyDefinitionId", "asc")
       .orderBy("valueOrder", "asc");
@@ -24,10 +24,10 @@ export class NodePropertyRepository extends CrudRepository<NodePropertyValues> {
     rows: Omit<NodePropertyValues, "id">[],
   ): Promise<void> {
     if (definitionIds.length > 0) {
-      await this.qb.where({ nodeId }).whereIn("propertyDefinitionId", definitionIds).del();
+      await this.qb().where({ nodeId }).whereIn("propertyDefinitionId", definitionIds).del();
     }
     if (rows.length > 0) {
-      await this.qb.insert(rows);
+      await this.qb().insert(rows);
     }
   }
 }

@@ -11,18 +11,16 @@ export class NodeRepository extends CrudRepository<Node> {
     super(knex, "nodes");
   }
 
-  // ---------- from develop (used by getTree) ----------
-
   /** All nodes of one structure, in sibling order. */
   async findByStructure(structureId: number): Promise<Node[]> {
-    return this.qb
+    return this.qb()
       .where({ structureId })
       .orderBy([{ column: "parentId" }, { column: "sortOrder" }, { column: "id" }]);
   }
 
   /** All property values of one structure in a single query (a join, so no huge IN list on MSSQL). */
   async findValuesByStructure(structureId: number): Promise<NodePropertyValues[]> {
-    return this.qb
+    return this.qb()
       .join("node_property_values as v", "v.node_id", "nodes.id")
       .where("nodes.structure_id", structureId)
       .select("v.*");
@@ -48,7 +46,7 @@ export class NodeRepository extends CrudRepository<Node> {
       const current = [...new Set(climbing.values())];
       const parentOf = new Map<number, number | null>();
       for (let i = 0; i < current.length; i += 500) {   // MSSQL allows at most 2100 parameters
-        const rows: { id: number; parent: number | null }[] = await this.qb
+        const rows: { id: number; parent: number | null }[] = await this.qb()
           .whereIn("id", current.slice(i, i + 500))
           .select({ id: "id", parent: "parent_id" });
         for (const r of rows) parentOf.set(r.id, r.parent);
@@ -65,15 +63,13 @@ export class NodeRepository extends CrudRepository<Node> {
     return found;
   }
 
-  // ---------- from my branch (used by createNode) ----------
-
   async findById(id: number): Promise<Node | undefined> {
-    const row = await this.qb.where({ id }).first();
+    const row = await this.qb().where({ id }).first();
     return row ? this.mapNode(row) : undefined;
   }
 
   async findByStructureId(structureId: number): Promise<Node[]> {
-    const rows = await this.qb
+    const rows = await this.qb()
       .where({ structure_id: structureId })
       .orderBy("sort_order", "asc")
       .select();
@@ -81,7 +77,7 @@ export class NodeRepository extends CrudRepository<Node> {
   }
 
   async findByParentId(parentId: number): Promise<Node[]> {
-    const rows = await this.qb
+    const rows = await this.qb()
       .where({ parent_id: parentId })
       .orderBy("sort_order", "asc")
       .select();
@@ -90,12 +86,12 @@ export class NodeRepository extends CrudRepository<Node> {
 
   /** true if at least one node has this node as its parent (F3.1: only leaf nodes can be deleted). */
   async hasChildren(id: number): Promise<boolean> {
-    const row = await this.qb.where({ parentId: id }).first();
+    const row = await this.qb().where({ parentId: id }).first();
     return row !== undefined;
   }
 
   async findRootNodes(structureId: number): Promise<Node[]> {
-    const rows = await this.qb
+    const rows = await this.qb()
       .where({ structure_id: structureId, parent_id: null })
       .orderBy("sort_order", "asc")
       .select();
@@ -107,7 +103,7 @@ export class NodeRepository extends CrudRepository<Node> {
     parentId: number | null,
     referenceCode: string,
   ): Promise<boolean> {
-    const query = this.qb.where({ structureId, referenceCode });
+    const query = this.qb().where({ structureId, referenceCode });
 
     if (parentId === null) {
       query.whereNull("parentId");
@@ -129,11 +125,11 @@ export class NodeRepository extends CrudRepository<Node> {
     referenceCode: string,
     excludeNodeId: number,
   ): Promise<boolean> {
-    const row = await this.qb
+    const row = await this.qb()
       .where({ structureId, referenceCode })
       .whereNot({ id: excludeNodeId })
       .first();
-    return row !== undefined;
+    return row !== undefined
   }
 
   /**
@@ -148,7 +144,7 @@ export class NodeRepository extends CrudRepository<Node> {
     updatedBy: number | null,
     expectedRowVersion?: Buffer | null,
   ): Promise<boolean> {
-    const query = this.qb.where({ id });
+    const query = this.qb().where({ id });
     if (expectedRowVersion) query.andWhere({ rowVersion: expectedRowVersion });
 
     const count = await query.update({
@@ -160,7 +156,7 @@ export class NodeRepository extends CrudRepository<Node> {
   }
 
   async createNode(data: CreateNodeData): Promise<Node> {
-    const [row] = await this.qb
+    const [row] = await this.qb()
       .insert({
         structure_id: data.structureId,
         parent_id: data.parentId,
@@ -208,7 +204,7 @@ export class NodeRepository extends CrudRepository<Node> {
   }
 
   async flipPublished(nodeId: number): Promise<Node> {
-      const node = await this.qb.where("id", nodeId).select().first();
+      const node = await this.qb().where("id", nodeId).select().first();
 
       if (!node) {
         throw new NotFoundError(`Node ${nodeId} was not found`);
@@ -217,20 +213,29 @@ export class NodeRepository extends CrudRepository<Node> {
       const nextStatus = !node.isPublished;
       node.isPublished = nextStatus;
 
-      await this.qb.where("id", nodeId).update({ isPublished: nextStatus });
+      await this.qb().where("id", nodeId).update({ isPublished: nextStatus });
       return node;
   }
 
   async flipPublishedByStructure(structureId: number, nextStatus: boolean): Promise<Node[]> {
 
-    await this.qb.where({ structureId: structureId }).update({ isPublished: nextStatus });
+    await this.qb().where({ structureId: structureId }).update({ isPublished: nextStatus });
 
-    const nodes = await this.qb.where({ structureId: structureId }).select();
+    const nodes = await this.qb().where({ structureId: structureId }).select();
 
     if (!nodes || nodes.length == 0) {
       return [];
     }
 
     return nodes
+  }
+
+    //Might need to redo this at some point?
+  async findStructureUnitIds(units: number[], structureNodeType: string) {
+    return await this.qb()
+        .join("node_types as t", "t.id", "nodes.node_type_id")
+        .where("t.code", structureNodeType)
+        .whereIn("nodes.id", units)
+        .select("nodes.id");
   }
 }

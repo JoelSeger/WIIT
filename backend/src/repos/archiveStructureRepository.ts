@@ -20,7 +20,7 @@ export class ArchiveStructureRepository extends CrudRepository<ArchiveStructure>
 
 
   async create(item: Omit<ArchiveStructure, "id" | "created_at">): Promise<ArchiveStructure> {
-    const [created] = await this.qb
+    const [created] = await this.qb()
       .insert(item)
       .returning("*");
 

@@ -16,6 +16,7 @@ import {
   type TabKey,
 } from "../types/node.properties.types";
 import { NotFoundError, ValidationError } from "../services/errorService";
+import { UnitOfWork } from "../config/db";
 
 interface StoredValue {
   valueText: string | null;
@@ -33,25 +34,25 @@ export type NodePropertyRepos = Pick<
 >;
 
 export class NodePropertyService {
-  constructor(
-    private readonly knex: Knex,
-    private readonly repos: NodePropertyRepos = createRepositories(knex),
-  ) {}
+  constructor(private readonly uow: UnitOfWork) {}
 
   // ---------------------------------------------------------------------------
   // Read: the form of one node = its fields (for its node type) + the current values
   // ---------------------------------------------------------------------------
 
   async getForm(nodeId: number): Promise<NodeForm> {
-    const node = await this.repos.nodes().findById(nodeId);
+      return this.buildForm(this.uow.repos, nodeId);
+  }
+
+  async buildForm(repos: NodePropertyRepos, nodeId: number): Promise<NodeForm> {
+    const node = await repos.nodes.findById(nodeId);
     if (!node) throw new NotFoundError(`Node ${nodeId} was not found`);
 
-    const nodeType = await this.repos.nodeTypes().findOne(node.nodeTypeId);
-    const structure = await this.repos.structures().findById(node.structureId);
-    const defRepo = this.repos.propertyDefinitions();
-    const defs = await defRepo.findActiveByNodeType(node.nodeTypeId);
-    const options = await defRepo.findActiveOptions(defs.filter((d) => d.dataType === "enum").map((d) => d.id));
-    const stored = await this.repos.nodeProperties().findByNodeId(nodeId);
+    const nodeType = await repos.nodeTypes.findOne(node.nodeTypeId);
+    const structure = await repos.structures.findById(node.structureId);
+    const defs = await repos.propertyDefinitions.findActiveByNodeType(node.nodeTypeId);
+    const options = await repos.propertyDefinitions.findActiveOptions(defs.filter((d) => d.dataType === "enum").map((d) => d.id));
+    const stored = await repos.nodeProperties.findByNodeId(nodeId);
 
     const byTab = new Map<TabKey, FormField[]>();
     for (const def of defs) {
@@ -107,16 +108,16 @@ export class NodePropertyService {
    * what an edit changed (change_log). Call inside the transaction that does the edit.
    */
   async snapshotValues(
-    trx: Knex.Transaction,
+    repos: NodePropertyRepos,
     node: Pick<Node, "id" | "nodeTypeId">,
     keys: string[],
   ): Promise<Record<string, FormFieldValue[]>> {
     const result: Record<string, FormFieldValue[]> = {};
     if (keys.length === 0) return result;
 
-    const defs = (await this.repos.propertyDefinitions(trx).findActiveByNodeType(node.nodeTypeId))
+    const defs = (await repos.propertyDefinitions.findActiveByNodeType(node.nodeTypeId))
       .filter((d) => keys.includes(d.key));
-    const stored = await this.repos.nodeProperties(trx).findByNodeId(node.id);
+    const stored = await repos.nodeProperties.findByNodeId(node.id);
 
     for (const def of defs) {
       result[def.key] = stored
@@ -128,10 +129,10 @@ export class NodePropertyService {
 
   /** Saves some fields of an existing node (e.g. everything on one tab). */
   async saveValues(nodeId: number, inputs: PropertyValueInput[], userId?: number | null): Promise<NodeForm> {
-    await this.knex.transaction(async (trx) => {
-      const node = await this.repos.nodes(trx).findById(nodeId);
+    await this.uow.run(async (repos) => {
+      const node = await repos.nodes.findById(nodeId);
       if (!node) throw new NotFoundError(`Node ${nodeId} was not found`);
-      await this.saveValuesInTransaction(trx, node, inputs, userId, false);
+      await this.saveValuesInTransaction(repos, node, inputs, userId, false);
     });
     return this.getForm(nodeId);
   }
@@ -144,14 +145,14 @@ export class NodePropertyService {
    * requireAll = false (editing): only the fields sent are checked.
    */
   async saveValuesInTransaction(
-    trx: Knex.Transaction,
+    repos: NodePropertyRepos,
     node: Pick<Node, "id" | "nodeTypeId">,
     inputs: PropertyValueInput[] | undefined,
     userId: number | null | undefined,
     requireAll: boolean,
   ): Promise<void> {
     const list = inputs ?? [];
-    const defRepo = this.repos.propertyDefinitions(trx);
+    const defRepo = repos.propertyDefinitions;
     const defs = await defRepo.findActiveByNodeType(node.nodeTypeId);
     if (list.length === 0 && !(requireAll && defs.some((d) => d.isRequired))) return;
 
@@ -225,7 +226,7 @@ export class NodePropertyService {
 
     // 3. replace the stored values of exactly the fields that were sent
     const ids = [...byKey.keys()].map((k) => defsByKey.get(k)!.id);
-    await this.repos.nodeProperties(trx).replaceValues(node.id, ids, rows);
+    await repos.nodeProperties.replaceValues(node.id, ids, rows);
   }
 
   // ---------------------------------------------------------------------------

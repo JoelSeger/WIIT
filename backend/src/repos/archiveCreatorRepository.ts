@@ -11,6 +11,6 @@ export class ArchiveCreatorRepository
   }
 
   async findById(id: number): Promise<ArchiveCreator | undefined> {
-    return this.qb.where({ id }).first();
+    return this.qb().where({ id }).first();
   }
 }

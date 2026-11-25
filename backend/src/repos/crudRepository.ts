@@ -23,17 +23,17 @@ export abstract class CrudRepository<T>
     public readonly tableName: string,
   ) {}
 
-  protected get qb(): Knex.QueryBuilder { return this.knex(this.tableName); } // Always use this when accessing the DB!!
+    protected qb(tableName: string = this.tableName): Knex.QueryBuilder { return this.knex(tableName); } // Always use this when accessing the DB!!
 
   async find(item: Partial<T>): Promise<T[]> {
-    return this.qb.where(item).select() as Promise<T[]>;
+    return this.qb().where(item).select() as Promise<T[]>;
   }
 
   async findAll(
     limit: number = 100,
     offset: number = 0,
   ): Promise<T[]> {
-    return this.qb
+    return this.qb()
       .select()
       .limit(limit)
       .offset(offset) as Promise<T[]>;
@@ -44,37 +44,37 @@ export abstract class CrudRepository<T>
   ): Promise<T | undefined> {
     const query = typeof id === "number" ? { id } : id;
 
-    return this.qb.where(query).first() as Promise<T | undefined>;
+    return this.qb().where(query).first() as Promise<T | undefined>;
   }
 
   async exists(id: number | Partial<T>): Promise<boolean> {
     const query = typeof id === "number" ? { id } : id;
-    const row = await this.qb.where(query).first();
+    const row = await this.qb().where(query).first();
 
     return row !== undefined;
   }
 
   async create(item: Omit<T, "id">): Promise<T> {
-    const [created] = await this.qb.insert(item).returning("*");
+    const [created] = await this.qb().insert(item).returning("*");
 
     return created as T;
   }
 
   async createMany(items: Omit<T, "id">[]): Promise<T[]> {
-    return this.qb.insert(items).returning("*") as Promise<T[]>;
+    return this.qb().insert(items).returning("*") as Promise<T[]>;
   }
 
   async update(
     id: number,
     item: Partial<T>,
   ): Promise<boolean> {
-    const count = await this.qb.where({ id }).update(item);
+    const count = await this.qb().where({ id }).update(item);
 
     return Number(count) > 0;
   }
 
   async delete(id: number): Promise<boolean> {
-    const count = await this.qb.where({ id }).del();
+    const count = await this.qb().where({ id }).del();
 
     return Number(count) > 0;
   }

@@ -5,6 +5,7 @@ import { ValidationError } from "../services/errorService";
 import type { PropertyValueInput } from "../types/node.properties.types";
 import type { Knex } from "knex";
 import { isPositiveInt, optionalDate, optionalString } from "./requestParsers";
+import { UnitOfWork } from "../config/db";
 
 /**
  * Validates the request body and returns a typed request. Throws ValidationError.
@@ -67,11 +68,9 @@ export function parseCreateNodeBody(body: unknown, userId: number | null): Creat
 }
 
 export class NodeCreationController extends BaseController {
-  private readonly service: NodeCreationService;
 
-  constructor(knex: Knex) {
+  constructor(private readonly service: NodeCreationService) {
     super();
-    this.service = new NodeCreationService(knex);
   }
 
   /** POST /api/nodes */

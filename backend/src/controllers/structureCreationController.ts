@@ -1,10 +1,9 @@
 import type { Request, Response } from "express";
-import type { Knex } from "knex";
-
 import { BaseController } from "./baseController";
 import { StructureCreationService } from "../services/structureCreatorService";
 import { ValidationError } from "../services/errorService";
 import type { CreateStructureRequest } from "../types/structureCreation.types";
+import { UnitOfWork } from "../config/db";
 
 const isPositiveInt = (v: unknown) => Number.isInteger(v) && (v as number) > 0;
 
@@ -34,9 +33,9 @@ function validateBody(body: unknown): void {
 export class StructureCreationController extends BaseController {
   private readonly structureCreationService: StructureCreationService;
 
-  constructor(knex: Knex) {
+  constructor(private readonly uow: UnitOfWork) {
     super();
-    this.structureCreationService = new StructureCreationService(knex);
+    this.structureCreationService = new StructureCreationService(uow);
   }
 
   /** POST /api/structures */

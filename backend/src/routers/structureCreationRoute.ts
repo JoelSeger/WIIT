@@ -1,12 +1,13 @@
 import { Router } from "express";
 import type { Knex } from "knex";
-
 import { StructureCreationController } from "../controllers/structureCreationController";
 import { requireRole } from "../middleware/auth";
+import { UnitOfWork } from "../config/db";
 
-export function createStructureCreationRoutes(knex: Knex): Router {
+export function createStructureCreationRoutes(db: Knex): Router {
   const router = Router();
-  const controller = new StructureCreationController(knex);
+  const uow = new UnitOfWork(db)
+  const controller = new StructureCreationController(uow);
 
   router.post("/", requireRole("editor"), controller.create);
 
