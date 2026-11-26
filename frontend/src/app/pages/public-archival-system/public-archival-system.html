@@ -10,6 +10,7 @@
                 placeholder="Sök i arkivet..." 
                 type="text"
                 (input)="onSearch($event)"
+                (keydown.enter)="onSearchEnter()"
             >
                
     @if (searchResults.length > 0) {

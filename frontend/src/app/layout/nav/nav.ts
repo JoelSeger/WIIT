@@ -1,5 +1,5 @@
 import { Component, inject, output, HostListener, ElementRef, DestroyRef, ChangeDetectorRef } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { RouterLink, Router } from '@angular/router';
 import { LoginService } from '../../core/services/login.service';
 import { SearchService } from '../../services/search.service';
 import { SearchResult } from '../../models/search';
@@ -55,6 +55,7 @@ export class Nav {
   private searchService = inject(SearchService);
   private destroyRef = inject(DestroyRef);
   private cdr = inject(ChangeDetectorRef);
+  private router = inject(Router);
 
   // Handles search requests with debounce
   ngOnInit(): void {
@@ -93,7 +94,23 @@ export class Nav {
     this.searchSubject.next(this.searchText.trim());
   }
 
-  
+
+  // Navigates to the search results page when Enter is pressed
+  onSearchEnter(): void {
+    const query = this.searchText.trim();
+
+    if (query.length >= 3) {
+      this.searchSuggestions = [];
+      this.searchCompleted = false;
+      this.searchText = '';
+
+      this.router.navigate(['/search'], {
+        queryParams: { q: query, page: 1 }
+      });
+    }
+  }
+
+
   selectSuggestion(result: SearchResult): void {
     console.log('Selected search result:', result);
     this.searchText = result.title;

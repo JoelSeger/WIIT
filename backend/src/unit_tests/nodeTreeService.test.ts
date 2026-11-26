@@ -1,5 +1,7 @@
 /**
- Unit tests for NodeService.
+ Unit tests for NodeTreeService (services/nodeTreeService.ts).
+ This used to be nodeService.test.ts. NodeService was split up on develop and getTree
+ now lives in NodeTreeService (same code), so the tests moved here and kept their ids.
  All four repositories are mocked with jest.fn(), so nothing here touches any db.
  Covers getTree from start to end: the early exits, how the flat node rows are
  turned into a nested tree, how field values get attached and sorted, and what
@@ -27,7 +29,7 @@ import type { NodeRepository } from '../repos/nodeRepository';
 import type { NodeTypeRepository } from '../repos/nodeTypeRepository';
 import type { PropertyDefinitionRepository } from '../repos/propertyDefinitionRepository';
 import type { StructureRepository } from '../repos/structureRepository';
-import { NodeService } from '../services/nodeService';
+import { NodeTreeService } from '../services/nodeTreeService';
 
 
 // setup for the tests
@@ -83,6 +85,8 @@ const makeNodeType = (overrides: Partial<NodeType> = {}): NodeType => ({
     eadUnitDescription: null,
     description: null,
     isActive: true,
+    canBeRoot: false,
+    hasActivities: false,
     ...overrides,
 
 });
@@ -119,12 +123,12 @@ const makeValue = (overrides: Partial<NodePropertyValues> = {}): NodePropertyVal
 // The Tests
 // ──────────────────────────────────────
 
-describe('NodeService', () => {
+describe('NodeTreeService', () => {
     let nodes: jest.Mocked<NodeRepository>;
     let nodeTypes: jest.Mocked<NodeTypeRepository>;
     let definitions: jest.Mocked<PropertyDefinitionRepository>;
     let structures: jest.Mocked<StructureRepository>;
-    let service: NodeService;
+    let service: NodeTreeService;
 
     beforeEach(() => {
         nodes = {
@@ -140,7 +144,7 @@ describe('NodeService', () => {
         nodes.findValuesByStructure.mockResolvedValue([]);
         definitions.findByIds.mockResolvedValue([]);
 
-        service = new NodeService(nodes, nodeTypes, definitions, structures);
+        service = new NodeTreeService(nodes, nodeTypes, definitions, structures);
     });
 
 

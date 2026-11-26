@@ -3,7 +3,7 @@ import { SearchService } from '../../services/search.service';
 import { SearchResult } from '../../models/search';
 import { Subject, debounceTime, distinctUntilChanged, switchMap, of, catchError } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-public-archival-system',
@@ -22,6 +22,7 @@ export class PublicArchivalSystem {
   private searchService = inject(SearchService);
   private destroyRef = inject(DestroyRef);
   private cdr = inject(ChangeDetectorRef);
+  private router = inject(Router);
 
   // Handles search requests with debounce
   ngOnInit(): void {
@@ -33,7 +34,7 @@ export class PublicArchivalSystem {
           return of(null);
         }
         // catchError keeps the search working after a failed request
-        return this.searchService.search(query).pipe(
+        return this.searchService.search(query, 10).pipe(
           catchError(error => {
             console.error('Search failed:', error);
             return of(null);
@@ -60,6 +61,17 @@ export class PublicArchivalSystem {
     }
 
     this.searchSubject.next(this.searchText.trim());
+  }
+
+  onSearchEnter(): void {
+    console.log('Enter pressed!', this.searchText);
+    const query = this.searchText.trim();
+
+    if (query.length >= 3){
+      this.router.navigate(['/search'], {
+        queryParams: { q: query,page: 1}
+      })
+    }
   }
 
   // Handles clicks on search results (navigation will be added later)
