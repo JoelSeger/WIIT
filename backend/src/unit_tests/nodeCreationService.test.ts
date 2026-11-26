@@ -65,6 +65,8 @@ const makeNodeType = (overrides: Partial<NodeType> = {}): NodeType => ({
     eadUnitDescription: null,
     description: null,
     isActive: true,
+    canBeRoot: false,
+    hasActivities: false,
     ...overrides,
 });
 
@@ -195,8 +197,9 @@ describe('NodeCreationService', () => {
     describe('createNode - root and parent rules', () => {
 
         /*
-         Verifies that a node without parent is only allowed when its type may be a root in
-         this kind of structure. A processgrupp cannot be a root of a klassificering structure.
+         Verifies that a node without parent is only allowed when its type may be a root
+         (canBeRoot, migration 012). A processgrupp has canBeRoot false, so it cannot be a
+         root of a klassificering structure.
          */
         test('_TC203_createNode_rejectsRootOfTypeThatCannotBeRoot', async () => {
             const request = makeRequest({ parentId: null });
@@ -208,16 +211,31 @@ describe('NodeCreationService', () => {
 
 
         /*
-         Verifies that a verksamhetsomrade is accepted as a root of a klassificering structure:
-         no parent lookup is done and the node is created with parentId null.
+         Verifies that a verksamhetsomrade (canBeRoot true) is accepted as a root of a
+         klassificering structure: no parent lookup is done and the node is created with
+         parentId null.
          */
         test('_TC204_createNode_acceptsVerksamhetsomradeAsRoot', async () => {
-            nodeTypes.findByCode.mockResolvedValue(makeNodeType({ id: 100, code: 'verksamhetsomrade' }));
+            nodeTypes.findByCode.mockResolvedValue(makeNodeType({ id: 100, code: 'verksamhetsomrade', canBeRoot: true }));
 
             await service.createNode(makeRequest({ parentId: null, nodeTypeCode: 'verksamhetsomrade' }));
 
             expect(nodes.findById).not.toHaveBeenCalled();
             expect(nodes.createNode).toHaveBeenCalledWith(expect.objectContaining({ parentId: null, nodeTypeId: 100 }));
+        });
+
+
+        /*
+         Verifies that it is the canBeRoot flag that decides and not the type code: a
+         processgrupp with canBeRoot = 1 (how SQLite gives it back) is accepted as a root.
+         */
+        test('_TC293_createNode_acceptsAnyTypeWithCanBeRootAsRoot', async () => {
+            nodeTypes.findByCode.mockResolvedValue(makeNodeType({ canBeRoot: 1 }));
+
+            await service.createNode(makeRequest({ parentId: null }));
+
+            expect(nodes.findById).not.toHaveBeenCalled();
+            expect(nodes.createNode).toHaveBeenCalledWith(expect.objectContaining({ parentId: null, nodeTypeId: 200 }));
         });
 
 

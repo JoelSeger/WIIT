@@ -25,6 +25,7 @@ import type {
     Archive,
     LoadedStructure,
     NodeProperty,
+    NodeRelation,
     NodeType,
     StructureRow,
     TreeNode,
@@ -92,6 +93,14 @@ const makeProperty = (overrides: Partial<NodeProperty> = {}): NodeProperty =>
     data_type: 'text',
     ead_element: 'did/unitdate',
     value: '2001 -- 2010',
+    ...overrides,
+});
+
+const makeRelation = (overrides: Partial<NodeRelation> = {}): NodeRelation => ({
+    code: 'forvaras_i',
+    name: 'förvaras i',
+    ead_element: 'physloc',
+    target: { id: 99, reference_code: '1', title: 'Arkivbox 1', structure_name: 'Förvaringsenheter' },
     ...overrides,
 });
 
@@ -260,8 +269,128 @@ describe('buildRaEad', () =>{
             expect(xml).toContain('<unitdate>2001-01-01 -- 2010-12-31</unitdate>');
         });
 
+
+        /*
+         Verifies validity dates when only one side is set: only from gives "from --", only to
+         gives "-- to". An otherlevel type without ead_otherlevel falls back to its own code.
+         */
+        test('_TC100_buildRaEad_writesOpenDateRanges', () => {
+            const onlyFrom = makeNode({ id: 1, reference_code: 'A1', valid_from: '2001-01-01' });
+            const onlyTo = makeNode({
+                id: 2, reference_code: 'B1', title: 'Koncept', valid_to: '2010-12-31',
+                type: { code: 'svit', name: 'Svit', ead_level: 'otherlevel', ead_otherlevel: null, ead_unit_description: null },
+            });
+
+            const xml = build({ structure: makeStructure(), archive: null, roots: [onlyFrom, onlyTo] });
+
+            expect(xml).toContain('<unitdate>2001-01-01 --</unitdate>');
+            expect(xml).toContain('<unitdate>-- 2010-12-31</unitdate>');
+            expect(xml).toContain('<c level="otherlevel" otherlevel="svit">');
+        });
+
+
+        /*
+         Verifies an archive without Arkiv node: the archive gives the title, its reference code
+         the <unitid>, its description the <custodhist>, and every top node is a <c>.
+         */
+        test('_TC101_buildRaEad_usesArchiveWithoutArkivNode', () => {
+            const archive = makeArchive({ reference_code: 'GV-1', description: 'Arkivet efter förvaltningen.' });
+
+            const xml = build({ structure: makeStructure(), archive, roots: [makeNode()] });
+
+            expect(xml).toContain('<titleproper>Testförvaltningens arkiv</titleproper>');
+            expect(xml).toContain('<unitid>GV-1</unitid>');
+            expect(xml).toContain('<p>Arkivet efter förvaltningen.</p>');
+            expect(xml).toContain('<corpname authfilenumber="MAH-1" role="arkivbildare">');
+            expect(xml).toContain('<c level="series">');
+        });
+
     });
 
 
+
+    describe('buildRaEad - fields and relations', () => {
+
+        /*
+         Verifies the other <did> fields: Sammanfattning as <abstract>, an extra identifier as
+         <unitid type="key">, an Omfång that is not "number unit" stays plain text in
+         <physdesc>, a 'physloc' relation becomes <physloc> with the target, and the
+         titel_etikett field gives the label of <unittitle> instead of the title.
+         */
+        test('_TC102_buildRaEad_writesOtherDidFields', () => {
+            const node = makeNode({
+                properties: [
+                    makeProperty({ key: 'abstract', label: 'Sammanfattning', ead_element: 'did/abstract', value: 'Kort om serien.' }),
+                    makeProperty({ key: 'annan_beteckning', label: 'Annan beteckning', ead_element: 'did/unitid', value: 'X-12' }),
+                    makeProperty({ key: 'omfang', label: 'Omfång', ead_element: 'did/physdesc', value: 'en hyllmeter' }),
+                    makeProperty({ key: 'titel_etikett', label: 'Titel (etikett)', ead_element: null, value: 'Styrelsens protokoll 2001-2010.' }),
+                ],
+                relations: [makeRelation()],
+            });
+
+            const xml = build({ structure: makeStructure(), archive: null, roots: [node] });
+
+            expect(xml).toContain('<abstract>Kort om serien.</abstract>');
+            expect(xml).toContain('<unitid type="annan_beteckning">X-12</unitid>');
+            expect(xml).toContain('<physdesc>en hyllmeter</physdesc>');
+            expect(xml).not.toContain('<extent');
+            expect(xml).toContain('<physloc>Förvaringsenheter: 1 Arkivbox 1</physloc>');
+            expect(xml).toContain('<unittitle label="Styrelsens protokoll 2001-2010.">Styrelsens protokoll</unittitle>');
+            expect(xml).not.toContain('<odd type="titel_etikett">');
+        });
+
+
+        /*
+         Verifies the blocks of a node: its description becomes <scopecontent>, a field with a
+         block element (appraisal) gets that tag with the label as <head>, a field without any
+         mapping becomes <odd type="key"> so nothing is lost, an empty value still gives one
+         empty <p></p>, and a relation that is not physloc becomes <relatedmaterial type="code">.
+         A target without reference code is described as "structure: title".
+         */
+        test('_TC103_buildRaEad_writesBlocksAndRelations', () => {
+            const node = makeNode({
+                description: 'Protokoll från styrelsens möten.',
+                properties: [
+                    makeProperty({ key: 'gallringsforeskrifter', label: 'Gallringsföreskrifter', ead_element: 'appraisal', value: 'Bevaras' }),
+                    makeProperty({ key: 'kortnamn', label: 'Kortnamn', ead_element: null, value: 'SP' }),
+                    makeProperty({ key: 'ovrigt', label: 'Övrigt', ead_element: null, value: '' }),
+                ],
+                relations: [makeRelation({
+                    code: 'redovisas_under', name: 'redovisas under', ead_element: 'odd',
+                    target: { id: 7, reference_code: null, title: 'Ansökan', structure_name: 'IHP' },
+                })],
+            });
+
+            const xml = build({ structure: makeStructure(), archive: null, roots: [node] });
+
+            expect(xml).toContain('<p>Protokoll från styrelsens möten.</p>');
+            expect(xml).toContain('<appraisal>');
+            expect(xml).toContain('<head>Gallringsföreskrifter</head>');
+            expect(xml).toContain('<odd type="kortnamn">');
+            expect(xml).toContain('<p>SP</p>');
+            expect(xml).toContain('<odd type="ovrigt">');
+            expect(xml).toContain('<p></p>');
+            expect(xml).toContain('<relatedmaterial type="redovisas_under">');
+            expect(xml).toContain('<p>IHP: Ansökan</p>');
+        });
+
+    });
+
+
+
+    describe('buildRaEad - options', () => {
+
+        /*
+         Verifies that without options today's date is written in <revisiondesc>.
+         */
+        test('_TC104_buildRaEad_usesTodayByDefault', () => {
+            const today = new Date().toISOString().slice(0, 10);
+
+            const xml = buildRaEad(makeImported());
+
+            expect(xml).toContain(`<date>${today}</date>`);
+        });
+
+    });
 
 });
