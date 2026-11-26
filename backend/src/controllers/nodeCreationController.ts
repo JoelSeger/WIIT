@@ -3,9 +3,7 @@ import { BaseController } from "./baseController";
 import { NodeCreationService, type CreateNodeRequest } from "../services/nodeCreationService";
 import { ValidationError } from "../services/errorService";
 import type { PropertyValueInput } from "../types/node.properties.types";
-import type { Knex } from "knex";
 import { isPositiveInt, optionalDate, optionalString } from "./requestParsers";
-import { UnitOfWork } from "../config/db";
 
 /**
  * Validates the request body and returns a typed request. Throws ValidationError.

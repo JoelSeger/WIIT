@@ -1,5 +1,4 @@
 import type { Request, Response } from "express";
-import type { Knex } from "knex";
 import { BaseController } from "./baseController";
 import { NodePropertyService } from "../services/nodePropertyService";
 import { NodeActivityService } from "../services/nodeActivityService";
@@ -8,7 +7,6 @@ import { ValidationError } from "../services/errorService";
 import { isPositiveInt, optionalDate, optionalString } from "./requestParsers";
 import type { ActivityInput, PropertyValueInput } from "../types/node.properties.types";
 import type { EditNodeRequest } from "../types/nodeEdit.types";
-import { UnitOfWork } from "../config/db";
 
 const has = (b: Record<string, unknown>, key: string): boolean => b[key] !== undefined;
 

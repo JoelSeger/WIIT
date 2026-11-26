@@ -1,4 +1,3 @@
-import { Knex } from "knex";
 import type { Response, Request } from 'express';
 import { StructureEditService } from "../services/structureEditService";
 import { BaseController } from "./baseController";

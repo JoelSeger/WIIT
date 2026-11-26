@@ -1,28 +1,20 @@
-import { Knex } from "knex";
 import { Structure } from "../models/structure/structure";
 import { Node } from "../models/node/node";
-import { StructureRepository } from "../repos/structureRepository";
-import { NodeRepository } from "../repos/nodeRepository";
+import { UnitOfWork } from "../config/db";
 
 export class StructureEditService {
 
-  private readonly structure: StructureRepository;
-  private readonly node: NodeRepository;
-
-  constructor(private readonly knex: Knex) {
-    this.structure = new StructureRepository(knex);
-    this.node = new NodeRepository(knex);
-  }
+  constructor(private readonly uow: UnitOfWork) { }
 
   async flipPublished(id: number): Promise<{
      parent: Structure,
      children: Node[]
    }> {
-     return await this.knex.transaction(async (trx) => {
+     return await this.uow.run(async (repos) => {
 
-       const structure = await this.structure.flipPublished(id);
+       const structure = await repos.structures.flipPublished(id);
 
-       const nodes = await this.node.flipPublishedByStructure(structure.id, structure.isPublished)
+       const nodes = await repos.nodes.flipPublishedByStructure(structure.id, structure.isPublished)
 
        return { parent: structure, children: nodes };
      })

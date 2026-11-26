@@ -6,8 +6,7 @@ import { UnitOfWork } from "../config/db";
 
 export function createStructureCreationRoutes(db: Knex): Router {
   const router = Router();
-  const uow = new UnitOfWork(db)
-  const controller = new StructureCreationController(uow);
+  const controller = new StructureCreationController(new UnitOfWork(db));
 
   router.post("/", requireRole("editor"), controller.create);
 

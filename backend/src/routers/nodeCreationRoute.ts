@@ -15,13 +15,12 @@ import { NodeEditService } from "../services/nodeEditService";
 export function createNodeCreationRouter(db: Knex): Router {
   const router = Router();
 
-  const uow = new UnitOfWork(db);
-  const creation = new NodeCreationController(new NodeCreationService(uow));
-  const deletion = new NodeDeleteController(new NodeDeleteService(uow));
+  const creation = new NodeCreationController(new NodeCreationService(new UnitOfWork(db)));
+  const deletion = new NodeDeleteController(new NodeDeleteService(new UnitOfWork(db)));
   const properties = new NodePropertyController(
-      new NodePropertyService(uow),
-      new NodeActivityService(uow),
-      new NodeEditService(uow)
+      new NodePropertyService(new UnitOfWork(db)),
+      new NodeActivityService(new UnitOfWork(db)),
+      new NodeEditService(new UnitOfWork(db))
   );
 
   // Creating and editing nodes is restricted to editors.
