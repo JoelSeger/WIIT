@@ -75,6 +75,8 @@ const makeNodeType = (overrides: Partial<NodeType> = {}): NodeType => ({
   eadUnitDescription: null,
   description: null,
   isActive: true,
+  canBeRoot: false,
+  hasActivities: true,
   ...overrides,
 });
 
