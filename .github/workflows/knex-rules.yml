@@ -2,9 +2,9 @@ name: Check DB Rules
 
 on:
   pull_request:
-    branches: [main]
+    branches: [develop]
   push:
-    branches: [main]
+    branches: [develop]
 
 jobs:
   check-db:
