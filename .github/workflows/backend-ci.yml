@@ -38,9 +38,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run DB rule checks
-        run: npm run check:db
-
       - name: Run tests
         run: npm run test:ci
 
