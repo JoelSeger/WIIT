@@ -24,6 +24,7 @@ export class StructureEditService {
 
        const nodes = await this.node.flipPublishedByStructure(structure.id, structure.isPublished)
 
+       //ADD CHANGELOGGING HERE!!!
        return { parent: structure, children: nodes };
      })
    }

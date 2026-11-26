@@ -93,7 +93,7 @@ export class NodeEditService {
          entityType: "node",
          entityId: newNode.id,
          structureId: newNode.structureId,
-         action: "update",
+         action: newNode.isPublished ? "publish" : "unpublish",
          oldValue: (!newNode.isPublished!).toString(),
          newValue: newNode.isPublished!.toString(),
          comment: "Changed the published status",
