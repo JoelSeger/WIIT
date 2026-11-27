@@ -3,12 +3,12 @@ import { CrudRepository } from "./crudRepository";
 import type { NodePropertyValues } from "../models/node/nodePropertyValues";
 
 export class NodePropertyRepository extends CrudRepository<NodePropertyValues> {
-  constructor(knex: Knex, trx?: Knex.Transaction) {
-    super(knex, "node_property_values", trx);
+  constructor(knex: Knex) {
+    super(knex, "node_property_values");
   }
 
   async findByNodeId(nodeId: number): Promise<NodePropertyValues[]> {
-    return this.qb
+    return this.qb()
       .where({ nodeId })
       .orderBy("propertyDefinitionId", "asc")
       .orderBy("valueOrder", "asc");
@@ -24,10 +24,10 @@ export class NodePropertyRepository extends CrudRepository<NodePropertyValues> {
     rows: Omit<NodePropertyValues, "id">[],
   ): Promise<void> {
     if (definitionIds.length > 0) {
-      await this.qb.where({ nodeId }).whereIn("propertyDefinitionId", definitionIds).del();
+      await this.qb().where({ nodeId }).whereIn("propertyDefinitionId", definitionIds).del();
     }
     if (rows.length > 0) {
-      await this.qb.insert(rows);
+      await this.qb().insert(rows);
     }
   }
 }

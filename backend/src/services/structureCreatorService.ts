@@ -1,8 +1,3 @@
-
-import type { Knex } from "knex";
-
-import { createRepositories, type Repositories } from "../repos/repositories";
-
 import type { ArchiveCreator } from "../models/archive/archiveCreator";
 import type { Archive } from "../models/archive/archive";
 import type { Structure } from "../models/structure/structure";
@@ -11,6 +6,7 @@ import type {
   CreateStructureRequest,
 } from "../types/structureCreation.types";
 import { ConflictError, NotFoundError, ValidationError } from "./errorService";
+import { UnitOfWork } from "../config/db";
 
 export interface CreateStructureResult {
   archiveCreator?: ArchiveCreator;
@@ -18,16 +14,8 @@ export interface CreateStructureResult {
   structure: Structure;
 }
 
-export type StructureCreationRepos = Pick<
-  Repositories,
-  "structures" | "archives" | "archiveCreators" | "archiveStructures"
->;
-
 export class StructureCreationService {
-  constructor(
-    private readonly knex: Knex,
-    private readonly repos: StructureCreationRepos = createRepositories(knex),
-  ) {}
+  constructor(private readonly uow: UnitOfWork) {}
 
   async create(
     request: CreateStructureRequest,
@@ -37,15 +25,11 @@ export class StructureCreationService {
     if (!code) throw new ValidationError("Structure code is required.");
     if (!name) throw new ValidationError("Structure name is required.");
 
-    if (await this.repos.structures().findByCode(code)) {
+    if (await this.uow.repos.structures.findByCode(code)) {
       throw new ConflictError(`A structure with code '${code}' already exists.`);
     }
 
-    return this.knex.transaction(async (trx) => {
-      const creatorRepository = this.repos.archiveCreators(trx);
-      const archiveRepository = this.repos.archives(trx);
-      const structureRepository = this.repos.structures(trx);
-      const archiveStructureRepository = this.repos.archiveStructures(trx);
+    return this.uow.run(async (repos) => {
 
       let createdCreator: ArchiveCreator | undefined;
       let archive: Archive;
@@ -57,7 +41,7 @@ export class StructureCreationService {
         }
 
         const existingArchive =
-          await archiveRepository.findById(request.archiveId);
+          await repos.archives.findById(request.archiveId);
 
         if (!existingArchive) {
           throw new NotFoundError("Archive not found.");
@@ -78,7 +62,7 @@ export class StructureCreationService {
           }
 
           const existingCreator =
-            await creatorRepository.findById(
+            await repos.archiveCreators.findById(
               request.archiveCreatorId,
             );
 
@@ -94,7 +78,7 @@ export class StructureCreationService {
 
           const now = new Date();
 
-          createdCreator = await creatorRepository.create({
+          createdCreator = await repos.archiveCreators.create({
             parentId: null,
             creatorType: "corporate",
             name: request.newArchiveCreator.name,
@@ -118,7 +102,7 @@ export class StructureCreationService {
         // Create archive
         const now = new Date();
 
-        archive = await archiveRepository.create({
+        archive = await repos.archives.create({
           archiveCreatorId: creatorId,
           referenceCode:
             request.newArchive.referenceCode ?? null,
@@ -138,7 +122,7 @@ export class StructureCreationService {
       // Create structure
       const now = new Date();
 
-      const structure = await structureRepository.create({
+      const structure = await repos.structures.create({
         code,
         name,
         structureType: "klassificering",
@@ -160,7 +144,7 @@ export class StructureCreationService {
       });
 
       // 5. Link an archive to a structure
-      await archiveStructureRepository.create({
+      await repos.archiveStructures.create({
         archiveId: archive.id,
         structureId: structure.id,
         validFrom: null,
@@ -168,7 +152,7 @@ export class StructureCreationService {
         createdBy: request.createdBy,
       });
 
-      
+
       return {
         archiveCreator: createdCreator,
         archive,

@@ -1,18 +1,10 @@
 import type { Node } from "../models/node/node";
 import type { NodeValue, TreeNode } from "../models/node/treeNode";
 import type { NodePropertyValues } from "../models/node/nodePropertyValues";
-import type { NodeRepository } from "../repos/nodeRepository";
-import type { NodeTypeRepository } from "../repos/nodeTypeRepository";
-import type { PropertyDefinitionRepository } from "../repos/propertyDefinitionRepository";
-import type { StructureRepository } from "../repos/structureRepository";
+import { UnitOfWork } from "../config/db";
 
 export class NodeTreeService {
-  constructor(
-    private readonly nodes: NodeRepository,
-    private readonly nodeTypes: NodeTypeRepository,
-    private readonly definitions: PropertyDefinitionRepository,
-    private readonly structures: StructureRepository,
-  ) {}
+  constructor(private readonly uow: UnitOfWork) {}
 
   /**
    * The whole tree of one structure.
@@ -25,18 +17,18 @@ export class NodeTreeService {
    * @returns null if the structure does not exist (or is hidden in public mode)
    */
   async getTree(structureId: number, publicOnly = false): Promise<TreeNode[] | null> {
-    const structure = await this.structures.findById(structureId);
+    const structure = await this.uow.repos.structures.findById(structureId);
     if (!structure) return null;
     if (publicOnly && !structure.isPublished) return null;
 
-    const nodes = await this.nodes.findByStructure(structureId);
+    const nodes = await this.uow.repos.nodes.findByStructure(structureId);
     if (nodes.length === 0) return [];
 
-    const values = await this.nodes.findValuesByStructure(structureId);
+    const values = await this.uow.repos.nodes.findValuesByStructure(structureId);
 
     const [types, defs] = await Promise.all([
-      this.nodeTypes.findByIds([...new Set(nodes.map((n) => n.nodeTypeId))]),
-      this.definitions.findByIds([...new Set(values.map((v) => v.propertyDefinitionId))]),
+      this.uow.repos.nodeTypes.findByIds([...new Set(nodes.map((n) => n.nodeTypeId))]),
+      this.uow.repos.propertyDefinitions.findByIds([...new Set(values.map((v) => v.propertyDefinitionId))]),
     ]);
 
     const valuesByNode = this.groupValues(values, new Map(defs.map((d) => [d.id, d])), publicOnly);

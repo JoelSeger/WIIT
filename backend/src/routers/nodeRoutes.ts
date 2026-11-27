@@ -2,22 +2,12 @@ import { Router } from "express";
 import type { Knex } from "knex";
 import { NodeController } from "../controllers/nodeController";
 import { NodeTreeService } from "../services/nodeTreeService";
-import { NodeRepository } from "../repos/nodeRepository";
-import { NodeTypeRepository } from "../repos/nodeTypeRepository";
-import { PropertyDefinitionRepository } from "../repos/propertyDefinitionRepository";
-import { StructureRepository } from "../repos/structureRepository";
 import { requireRole } from "../middleware/auth";
+import { UnitOfWork } from "../config/db";
 
 export function createNodeRouter(db: Knex): Router {
   const router = Router();
-
-  const service = new NodeTreeService(
-    new NodeRepository(db),
-    new NodeTypeRepository(db),
-    new PropertyDefinitionRepository(db),
-    new StructureRepository(db),
-  );
-  const controller = new NodeController(service);
+  const controller = new NodeController(new NodeTreeService(new UnitOfWork(db)));
 
   // test URI only! NEEDS CHANGE!
   router.get("/structures/:id/tree", requireRole("editor"), controller.getTree(false));

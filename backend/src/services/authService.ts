@@ -1,6 +1,5 @@
 import type { SessionUser } from "../types/session";
-import type { UserRepository } from "../repos/userRepository";
-import type { AdGroupRoleRepository } from "../repos/adGroupRoleRepository";
+import { UnitOfWork } from "../config/db";
 
 /**
  * Who someone is, as told by the login method.
@@ -20,17 +19,14 @@ export interface LoginIdentity {
  * find or create the user, then look up the roles their AD groups give.
  */
 export class AuthService {
-  constructor(
-    private readonly users: UserRepository,
-    private readonly groupRoles: AdGroupRoleRepository,
-  ) {}
+  constructor(private readonly uow: UnitOfWork) {}
 
   async login(identity: LoginIdentity): Promise<SessionUser> {
-    const user = await this.users.upsertOnLogin(identity);
+    const user = await this.uow.repos.user.upsertOnLogin(identity);
     // MSSQL returns false, SQLite (tests) returns 0; null/undefined = not set, counts as active
     if (user.isActive != null && !user.isActive) throw new InactiveUserError();
 
-    const roles = await this.groupRoles.rolesForGroups(identity.groups);
+    const roles = await this.uow.repos.adGroupRoles.rolesForGroups(identity.groups);
     return { ...user, roles };
   }
 }

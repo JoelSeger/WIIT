@@ -1,5 +1,4 @@
 import type { Request, Response } from "express";
-import type { Knex } from "knex";
 import { BaseController } from "./baseController";
 import { NodePropertyService } from "../services/nodePropertyService";
 import { NodeActivityService } from "../services/nodeActivityService";
@@ -67,16 +66,11 @@ export function parseEditNodeBody(nodeId: unknown, body: unknown, userId: number
 }
 
 export class NodePropertyController extends BaseController {
-  private readonly properties: NodePropertyService;
-  private readonly activities: NodeActivityService;
-  private readonly editing: NodeEditService;
-
-  constructor(knex: Knex) {
-    super();
-    this.properties = new NodePropertyService(knex);
-    this.activities = new NodeActivityService(knex);
-    this.editing = new NodeEditService(knex);
-  }
+  constructor(
+    private readonly properties: NodePropertyService,
+    private readonly activities: NodeActivityService,
+    private readonly editing: NodeEditService
+  ) { super(); }
 
   /**
    * PATCH /api/nodes/:id   (F3.2)

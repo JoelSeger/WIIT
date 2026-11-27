@@ -1,5 +1,6 @@
+import { UnitOfWork } from "../config/db";
 import type { SearchInput, SearchMatch, SearchPathItem, SearchResponse, SearchResult } from "../models/search/search";
-import type { NodeHitRow, SearchRepository, SkeletonRow, ValueHitRow } from "../repos/searchRepository";
+import type { NodeHitRow, SkeletonRow, ValueHitRow } from "../repos/searchRepository";
 
 /** Max rows each query may return. Keeps the IN list below the MSSQL parameter limit. */
 export const MAX_CANDIDATES = 500;
@@ -37,7 +38,7 @@ function snippet(text: string, q: string): string {
 type Scored = SearchResult & { score: number };
 
 export class SearchService {
-  constructor(private readonly repo: SearchRepository) {}
+  constructor(private readonly uow: UnitOfWork) {}
 
   /**
    * F4.1: one search over all structures (klassificering(EAD3), arkivförteckning(EAD2), förvaring(Fri).
@@ -59,8 +60,8 @@ export class SearchService {
     };
 
     const [nodeIds, valueHits] = await Promise.all([
-      this.repo.findNodeMatches(filter),
-      this.repo.findValueMatches(filter),
+      this.uow.repos.search.findNodeMatches(filter),
+      this.uow.repos.search.findValueMatches(filter),
     ]);
     const truncated = nodeIds.length >= MAX_CANDIDATES || valueHits.length >= MAX_CANDIDATES;
 
@@ -75,8 +76,8 @@ export class SearchService {
     const empty: SearchResponse = { query: q, total: 0, truncated, limit: input.limit, offset: input.offset, results: [] };
     if (ids.length === 0) return empty;
 
-    const nodes = await this.repo.findNodesByIds(ids);
-    const skeleton = await this.repo.findSkeleton([...new Set(nodes.map((n) => n.structureId))]);
+    const nodes = await this.uow.repos.search.findNodesByIds(ids);
+    const skeleton = await this.uow.repos.search.findSkeleton([...new Set(nodes.map((n) => n.structureId))]);
     const byId = new Map(skeleton.map((s) => [s.id, s]));
 
     const results: Scored[] = [];

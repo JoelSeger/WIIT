@@ -3,8 +3,8 @@ import { User } from "../models/user";
 import { CrudRepository } from "./crudRepository";
 
 export class UserRepository extends CrudRepository<User> {
-  constructor(knex: Knex, tableName: string) {
-    super(knex, tableName);
+  constructor(knex: Knex) {
+    super(knex, "users");
   }
 
   async getAll(limit: number, offset: number): Promise<User[]> {
@@ -17,7 +17,7 @@ export class UserRepository extends CrudRepository<User> {
 
   /** The user with this AD/Entra objectId, or undefined. */
   async findByAdObjectId(adObjectId: string): Promise<User | undefined> {
-    return this.qb.where({ adObjectId }).first();
+    return this.qb().where({ adObjectId }).first();
   }
 
   /**
@@ -39,11 +39,11 @@ export class UserRepository extends CrudRepository<User> {
 
     const existing = await this.findByAdObjectId(login.adObjectId);
     if (existing) {
-      await this.qb.where({ id: existing.id }).update(fields);
+      await this.qb().where({ id: existing.id }).update(fields);
       return { ...existing, ...fields };
     }
 
-    const [created] = await this.qb
+    const [created] = await this.qb()
       .insert({ adObjectId: login.adObjectId, ...fields })
       .returning("*");
     return created;

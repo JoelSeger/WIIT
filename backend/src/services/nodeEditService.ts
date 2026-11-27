@@ -1,11 +1,10 @@
-import type { Knex } from "knex";
 import type { NodeRepository } from "../repos/nodeRepository";
-import { createRepositories, type Repositories } from "../repos/repositories";
-import { NodePropertyService } from "./nodePropertyService";
 import { ConflictError, NotFoundError, ValidationError } from "./errorService";
 import type { Node } from "../models/node/node";
 import type { NodeForm } from "../types/node.properties.types";
 import type { EditNodeRequest, NodeAttributeChanges } from "../types/nodeEdit.types";
+import { UnitOfWork } from "../config/db";
+import { NodePropertyService } from "./nodePropertyService";
 
 /** What is written to change_log: only the things that really changed, old and new. */
 type Snapshot = Record<string, unknown>;
@@ -24,34 +23,27 @@ type Snapshot = Record<string, unknown>;
  * (moving a node is a separate function) and is_published (publishing is a separate function).
  */
 
-export type NodeEditRepos = Pick<Repositories, "nodes" | "changeLog" | "nodeTypes">;
-
 /** Only what this service calls on NodePropertyService – easy to fake in a test. */
 export type NodeEditProperties = Pick<NodePropertyService, "snapshotValues" | "saveValuesInTransaction" | "getForm">;
 
 export class NodeEditService {
-  constructor(
-    private readonly knex: Knex,
-    private readonly repos: NodeEditRepos = createRepositories(knex),
-    private readonly properties: NodeEditProperties = new NodePropertyService(knex),
-  ) {}
+  constructor(private readonly uow: UnitOfWork, private readonly properties: NodeEditProperties = new NodePropertyService(uow)) {}
 
   async editNode(request: EditNodeRequest): Promise<NodeForm> {
-    await this.knex.transaction(async (trx) => {
-      const nodes = this.repos.nodes(trx);
-      const node = await nodes.findById(request.nodeId);
+    await this.uow.run(async (repos) => {
+      const node = await repos.nodes.findById(request.nodeId);
       if (!node) throw new NotFoundError(`Node ${request.nodeId} was not found`);
 
       // --- 1. the node's own columns -------------------------------------------------------
       const { changes, oldValues, newValues } = this.diffColumns(node, request);
-      await this.validateColumns(nodes, node, changes);
+      await this.validateColumns(repos.nodes, node, changes);
 
       // --- 2. the property values ----------------------------------------------------------
       const inputs = request.properties ?? [];
       const keys = [...new Set(inputs.map((i) => i.key))];
-      const before = await this.properties.snapshotValues(trx, node, keys);
-      await this.properties.saveValuesInTransaction(trx, node, inputs, request.updatedBy, false);
-      const after = await this.properties.snapshotValues(trx, node, keys);
+      const before = await this.properties.snapshotValues(repos, node, keys);
+      await this.properties.saveValuesInTransaction(repos, node, inputs, request.updatedBy, false);
+      const after = await this.properties.snapshotValues(repos, node, keys);
 
       const changedKeys = keys.filter((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]));
       if (changedKeys.length > 0) {
@@ -63,7 +55,7 @@ export class NodeEditService {
       if (Object.keys(changes).length === 0 && changedKeys.length === 0) return;
 
       // --- 3. stamp the node, and make sure nobody else changed it meanwhile ----------------
-      const updated = await nodes.updateAttributes(node.id, changes, request.updatedBy, request.expectedRowVersion);
+      const updated = await repos.nodes.updateAttributes(node.id, changes, request.updatedBy, request.expectedRowVersion);
       if (!updated) {
         // Throwing rolls back the property values saved above as well.
         throw new ConflictError("The node was changed by someone else. Reload it and try again");
@@ -71,7 +63,9 @@ export class NodeEditService {
 
         //Extract nodetype for changelog
         // --- 4. traceability -----------------------------------------------------------------
-        await this.repos.changeLog(trx).record({
+        const nodeType = await repos.nodeTypes.findOne(node.id);
+        if (!nodeType) throw new NotFoundError(`NodeType with id: ${node.id} was not found`);
+        await repos.changeLog.record({
             entityType: "node",
             entityId: node.id,
             structureId: node.structureId,
@@ -87,9 +81,9 @@ export class NodeEditService {
   }
 
   async publishUnpublishNode(nodeId: number, userId: number): Promise<Node> {
-     return await this.knex.transaction(async (trx) => {
-       const newNode = await this.repos.nodes(trx).flipPublished(nodeId);
-       await this.repos.changeLog(trx).record({
+     return await this.uow.run(async (repos) => {
+       const newNode = await repos.nodes.flipPublished(nodeId);
+       await repos.changeLog.record({
          entityType: "node",
          entityId: newNode.id,
          structureId: newNode.structureId,

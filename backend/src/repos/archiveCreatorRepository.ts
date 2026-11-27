@@ -6,11 +6,11 @@ import { ArchiveCreator } from "../models/archive/archiveCreator";
 export class ArchiveCreatorRepository
   extends CrudRepository<ArchiveCreator> {
 
-  constructor(knex: Knex, trx?: Knex.Transaction) {
-    super(knex, "archive_creators", trx);
+  constructor(knex: Knex) {
+    super(knex, "archive_creators");
   }
 
   async findById(id: number): Promise<ArchiveCreator | undefined> {
-    return this.qb.where({ id }).first();
+    return this.qb().where({ id }).first();
   }
 }

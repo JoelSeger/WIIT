@@ -17,7 +17,8 @@
     "test": "jest",
     "test:ci": "jest --ci --coverage --watchAll=false",
     "test:legacy": "tsx test/ead-export.test.ts && tsx test/ead-import.test.ts && tsx test/ra-ead.test.ts && tsx test/search.test.ts && tsx test/auth.test.ts && tsx test/attributes.test.ts",
-    "report:summarize": "tsx scripts/test_report.ts"
+    "report:summarize": "tsx scripts/test_report.ts",
+    "check:db": "bash scripts/check-knex-rules.sh"
   },
   "keywords": [],
   "type": "commonjs",
