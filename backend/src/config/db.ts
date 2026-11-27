@@ -1,4 +1,4 @@
-import knex, { Knex } from "knex";
+import knex from "knex";
 import config from "../../knexfile";
 import knexStringcase from 'knex-stringcase';
 import { createRepositories, Repositories } from "../repos/repositories";
