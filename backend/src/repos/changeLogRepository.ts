@@ -8,50 +8,11 @@ export class ChangeLogRepository extends CrudRepository<ChangeLog> {
     super(knex, "change_log", trx);
   }
 
-
-    async record(entry: Partial<ChangeLog>): Promise<void> {
+  //ID and changedAt should be handled by the database not the program.
+    async record(entry: Omit<ChangeLog, "id" | "changedAt">): Promise<void> {
         await this.qb
             .insert({
                 ...entry
             });
     }
-
-  async logNodeUpdate(entry: {
-    nodeId: number;
-    structureId: number;
-    oldValue: unknown;
-    newValue: unknown;
-    changedBy: number | null;
-  }): Promise<void> {
-    await this.qb.insert({
-      entityType: "node",
-      entityId: entry.nodeId,
-      structureId: entry.structureId,
-      action: "update",
-      oldValue: JSON.stringify(entry.oldValue),
-      newValue: JSON.stringify(entry.newValue),
-      comment: null,
-      changedBy: entry.changedBy,
-      changedAt: new Date(),
-    });
-  }
-  /** The deleted node is kept in old_value, because the row itself is gone afterwards. */
-  async logNodeDelete(entry: {
-    nodeId: number;
-    structureId: number;
-    oldValue: unknown;
-    changedBy: number | null;
-  }): Promise<void> {
-    await this.qb.insert({
-      entityType: "node",
-      entityId: entry.nodeId,
-      structureId: entry.structureId,
-      action: "delete",
-      oldValue: JSON.stringify(entry.oldValue),
-      newValue: null,
-      comment: null,
-      changedBy: entry.changedBy,
-      changedAt: new Date(),
-    });
-  }
 }

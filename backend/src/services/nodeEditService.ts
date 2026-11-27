@@ -24,7 +24,7 @@ type Snapshot = Record<string, unknown>;
  * (moving a node is a separate function) and is_published (publishing is a separate function).
  */
 
-export type NodeEditRepos = Pick<Repositories, "nodes" | "changeLog">;
+export type NodeEditRepos = Pick<Repositories, "nodes" | "changeLog" | "nodeTypes">;
 
 /** Only what this service calls on NodePropertyService – easy to fake in a test. */
 export type NodeEditProperties = Pick<NodePropertyService, "snapshotValues" | "saveValuesInTransaction" | "getForm">;
@@ -69,17 +69,38 @@ export class NodeEditService {
         throw new ConflictError("The node was changed by someone else. Reload it and try again");
       }
 
-      // --- 4. traceability -----------------------------------------------------------------
-        await this.repos.changeLog(trx).logNodeUpdate({
-            nodeId: node.id,
+        //Extract nodetype for changelog
+        // --- 4. traceability -----------------------------------------------------------------
+        await this.repos.changeLog(trx).record({
+            entityType: "node",
+            entityId: node.id,
             structureId: node.structureId,
-            oldValue: oldValues,
-            newValue: newValues,
+            action: "update",
+            oldValue: JSON.stringify(oldValues),
+            newValue: JSON.stringify(newValues),
+            comment: null,
             changedBy: request.updatedBy,
         });
     });
 
     return this.properties.getForm(request.nodeId);
+  }
+
+  async publishUnpublishNode(nodeId: number, userId: number): Promise<Node> {
+     return await this.knex.transaction(async (trx) => {
+       const newNode = await this.repos.nodes(trx).flipPublished(nodeId);
+       await this.repos.changeLog(trx).record({
+         entityType: "node",
+         entityId: newNode.id,
+         structureId: newNode.structureId,
+         action: newNode.isPublished ? "publish" : "unpublish",
+         oldValue: (!newNode.isPublished!).toString(),
+         newValue: newNode.isPublished!.toString(),
+         comment: "Changed the published status",
+         changedBy: userId,
+       });
+         return newNode;
+      })
   }
 
   // ---------------------------------------------------------------------------
@@ -134,23 +155,5 @@ export class NodeEditService {
   private toDateString(d: unknown): string | null {
     if (!d) return null;
     return d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10);
-  }
-
-  async publishUnpublishNode(nodeId: number, userId: number): Promise<Node> {
-
-    return this.knex.transaction(async (trx) => {
-      const node = await this.repos.nodes(trx).flipPublished(nodeId);
-      await this.repos.changeLog(trx).record({
-        entityType: "node",
-        entityId: node.id,
-        structureId: node.structureId,
-        action: node.isPublished ? "publish" : "unpublish",
-        oldValue: JSON.stringify({ isPublished: !node.isPublished }),
-        newValue: JSON.stringify({ isPublished: node.isPublished }),
-        comment: "Changed the published status",
-        changedBy: userId,
-      });
-      return node;
-    });
   }
 }
