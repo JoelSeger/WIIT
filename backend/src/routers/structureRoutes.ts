@@ -4,6 +4,7 @@ import { hasRole, requireRole } from "../middleware/auth";
 import { StructureController } from "../controllers/structureController";
 import { StructureEditService } from "../services/structureEditService";
 import { UnitOfWork } from "../config/db";
+import { StructureCreationController } from "../controllers/structureCreationController";
 
 /**
  * GET /api/structures  - all structures (id, code, name, type …)
@@ -14,7 +15,11 @@ import { UnitOfWork } from "../config/db";
  */
 export function createStructureRouter(db: Knex): Router {
   const router = Router();
-    const controller = new StructureController(new StructureEditService(new UnitOfWork(db)));
+  const controller = new StructureController(new StructureEditService(new UnitOfWork(db)));
+  const createController = new StructureCreationController(new UnitOfWork(db));
+
+
+  router.post("/", requireRole("editor"), createController.create);
 
   // Rework this to fit the current pattern
   router.get("/", async (req, res, next) => {

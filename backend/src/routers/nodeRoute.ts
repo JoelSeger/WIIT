@@ -10,11 +10,14 @@ import { NodeDeleteService } from "../services/nodeDeleteService";
 import { NodePropertyService } from "../services/nodePropertyService";
 import { NodeActivityService } from "../services/nodeActivityService";
 import { NodeEditService } from "../services/nodeEditService";
+import { NodeController } from "../controllers/nodeController";
+import { NodeTreeService } from "../services/nodeTreeService";
 
 
-export function createNodeCreationRouter(db: Knex): Router {
+export function createNodeRouter(db: Knex): Router {
   const router = Router();
 
+  const controller = new NodeController(new NodeTreeService(new UnitOfWork(db)));
   const creation = new NodeCreationController(new NodeCreationService(new UnitOfWork(db)));
   const deletion = new NodeDeleteController(new NodeDeleteService(new UnitOfWork(db)));
   const properties = new NodePropertyController(
@@ -37,6 +40,10 @@ export function createNodeCreationRouter(db: Knex): Router {
     // Can be created on a process
   router.put("/:id/activities", requireRole("editor"), properties.saveActivities);
   router.put("/:id/publish", requireRole("editor"), properties.publishUnpublishNode)
+
+  // SHOULD PREFERABLY BE REWORKED TO FIT INTO STRUCTURES INSTEAD OF NODES!!!!
+  router.get("/structures/:id/tree", requireRole("editor"), controller.getTree(false));
+  router.get("/public/structures/:id/tree", controller.getTree(true));
 
   return router;
 }
