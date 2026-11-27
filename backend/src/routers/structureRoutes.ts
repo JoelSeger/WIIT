@@ -28,7 +28,7 @@ export function createStructureRouter(db: Knex): Router {
     }
   });
 
-  router.put("/publish", controller.flipPublished, requireRole("editor"));
+  router.put("/:id/publish", controller.flipPublished, requireRole("editor"));
 
   return router;
 }
