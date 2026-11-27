@@ -13,7 +13,6 @@ export class StructureEditService {
      return await this.uow.run(async (repos) => {
 
        const structure = await repos.structures.flipPublished(id);
-
        const nodes = await repos.nodes.flipPublishedByStructure(structure.id, structure.isPublished)
        //ADD CHANGELOG FOR ALL CHILDREN TOO!!
        await repos.changeLog.record({
@@ -21,11 +20,24 @@ export class StructureEditService {
          entityId: structure.id,
          structureId: structure.id,
          action: structure.isPublished ? "publish" : "unpublish",
-         oldValue: (!structure.isPublished!).toString(),
-         newValue: structure.isPublished!.toString(),
+         oldValue: JSON.stringify((!structure.isPublished!)),
+         newValue: JSON.stringify(structure.isPublished!),
          comment: "Changed the published status",
          changedBy: userId,
        });
+
+       for (const node of nodes) {
+           await repos.changeLog.record({
+               entityType: "node",
+               entityId: node.id,
+               structureId: node.id,
+               action: node.isPublished ? "publish" : "unpublish",
+               oldValue: JSON.stringify((!node.isPublished!)),
+               newValue: JSON.stringify(node.isPublished!),
+               comment: "Changed the published status",
+               changedBy: userId,
+           });
+       }
 
        return { parent: structure, children: nodes };
      })
