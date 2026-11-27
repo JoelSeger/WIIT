@@ -6,7 +6,7 @@ export class StructureEditService {
 
   constructor(private readonly uow: UnitOfWork) { }
 
-  async flipPublished(id: number): Promise<{
+  async flipPublished(id: number, userId: number): Promise<{
      parent: Structure,
      children: Node[]
    }> {
@@ -15,6 +15,17 @@ export class StructureEditService {
        const structure = await repos.structures.flipPublished(id);
 
        const nodes = await repos.nodes.flipPublishedByStructure(structure.id, structure.isPublished)
+       //ADD CHANGELOG FOR ALL CHILDREN TOO!!
+       await repos.changeLog.record({
+         entityType: "structure",
+         entityId: structure.id,
+         structureId: structure.id,
+         action: structure.isPublished ? "publish" : "unpublish",
+         oldValue: (!structure.isPublished!).toString(),
+         newValue: structure.isPublished!.toString(),
+         comment: "Changed the published status",
+         changedBy: userId,
+       });
 
        return { parent: structure, children: nodes };
      })
