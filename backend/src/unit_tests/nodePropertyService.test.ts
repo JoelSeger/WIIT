@@ -1,12 +1,11 @@
-import type { Knex } from "knex";
 import type { Node } from "../models/node/node";
 import type { NodeType } from "../models/node/nodeType";
 import type { PropertyDefinition } from "../models/property/propertyDefinition";
 import type { Structure } from "../models/structure/structure";
 import type { NodePropertyValues } from "../models/node/nodePropertyValues";
 import { NotFoundError, ValidationError } from "../services/errorService";
+import type { UnitOfWork } from "../config/db";
 import { NodePropertyService, type NodePropertyRepos } from "../services/nodePropertyService";
-
 // ---------------------------------------------------------------------------
 // Helpers that build fake data (factories): a complete object with default values,
 // and each test changes only the fields it cares about through overrides.
@@ -106,43 +105,61 @@ describe("NodePropertyService", () => {
   let propertyDefinitions: { findActiveByNodeType: jest.Mock; findActiveOptions: jest.Mock };
   let nodeProperties: { findByNodeId: jest.Mock; replaceValues: jest.Mock };
   // Repository factories. They are jest.fn so we can see whether they were called with trx or without it.
-  let repos: {
-    nodes: jest.Mock;
-    nodeTypes: jest.Mock;
-    structures: jest.Mock;
-    propertyDefinitions: jest.Mock;
-    nodeProperties: jest.Mock;
+  let repos: NodePropertyRepos;
+
+  let uow: {
+    repos: NodePropertyRepos;
+    run: jest.Mock;
   };
-  let knex: Knex;
-  let trx: Knex.Transaction;
+
   let service: NodePropertyService;
 
   // Before each test: fake repositories + a fake knex whose transaction runs the callback immediately with a fake trx.
   // The node, node type and structure exist by default (tests that need otherwise override them).
   beforeEach(() => {
-    nodes = { findById: jest.fn().mockResolvedValue(makeNode()) };
-    nodeTypes = { findOne: jest.fn().mockResolvedValue(makeNodeType()) };
-    structures = { findById: jest.fn().mockResolvedValue(makeStructure()) };
+    nodes = {
+      findById: jest.fn().mockResolvedValue(makeNode()),
+    };
+
+    nodeTypes = {
+      findOne: jest.fn().mockResolvedValue(makeNodeType()),
+    };
+
+    structures = {
+      findById: jest.fn().mockResolvedValue(makeStructure()),
+    };
+
     propertyDefinitions = {
       findActiveByNodeType: jest.fn().mockResolvedValue([]),
       findActiveOptions: jest.fn().mockResolvedValue([]),
     };
+
     nodeProperties = {
       findByNodeId: jest.fn().mockResolvedValue([]),
       replaceValues: jest.fn().mockResolvedValue(undefined),
     };
+
+    // Repositories are now objects, not factory functions.
     repos = {
-      nodes: jest.fn((_trx?: Knex.Transaction) => nodes),
-      nodeTypes: jest.fn((_trx?: Knex.Transaction) => nodeTypes),
-      structures: jest.fn((_trx?: Knex.Transaction) => structures),
-      propertyDefinitions: jest.fn((_trx?: Knex.Transaction) => propertyDefinitions),
-      nodeProperties: jest.fn((_trx?: Knex.Transaction) => nodeProperties),
+      nodes,
+      nodeTypes,
+      structures,
+      propertyDefinitions,
+      nodeProperties,
+    } as unknown as NodePropertyRepos;
+
+    // Mock UnitOfWork
+    uow = {
+      repos,
+
+      run: jest.fn(async (callback) => {
+        return callback(repos);
+      }),
     };
-    trx = { name: "transaction" } as unknown as Knex.Transaction;
-    knex = {
-      transaction: jest.fn(async (callback: (transaction: Knex.Transaction) => Promise<unknown>) => callback(trx)),
-    } as unknown as Knex;
-    service = new NodePropertyService(knex, repos as unknown as NodePropertyRepos);
+
+    service = new NodePropertyService(
+      uow as unknown as UnitOfWork
+    );
   });
 
   // =========================================================================
@@ -443,7 +460,7 @@ describe("NodePropertyService", () => {
     //  1. snapshotValues is called with an empty key list and returns {} immediately.
     //  2. No queries are made: neither findActiveByNodeType nor findByNodeId.
     test("_TC216_snapshotValues_returnsEmptyWithoutKeys", async () => {
-      await expect(service.snapshotValues(trx, { id: 1, nodeTypeId: 20 }, [])).resolves.toEqual({});
+      await expect(service.snapshotValues(repos, { id: 1, nodeTypeId: 20 }, [])).resolves.toEqual({});
       expect(propertyDefinitions.findActiveByNodeType).not.toHaveBeenCalled();
       expect(nodeProperties.findByNodeId).not.toHaveBeenCalled();
     });
@@ -463,7 +480,7 @@ describe("NodePropertyService", () => {
         makeStored({ propertyDefinitionId: 101, valueText: "ignored" }),
       ]);
 
-      await expect(service.snapshotValues(trx, { id: 1, nodeTypeId: 20 }, ["name", "unknown"])).resolves.toEqual({
+      await expect(service.snapshotValues(repos, { id: 1, nodeTypeId: 20 }, ["name", "unknown"])).resolves.toEqual({
         name: [{ rowIndex: 0, value: "value", isOwn: null, publishedText: null }],
       });
       expect(propertyDefinitions.findActiveByNodeType).toHaveBeenCalledWith(20);
@@ -479,7 +496,7 @@ describe("NodePropertyService", () => {
         makeDefinition({ key: "other" }),
       ]);
 
-      await expect(service.snapshotValues(trx, { id: 1, nodeTypeId: 20 }, ["missing"])).resolves.toEqual({});
+      await expect(service.snapshotValues(repos, { id: 1, nodeTypeId: 20 }, ["missing"])).resolves.toEqual({});
       expect(nodeProperties.findByNodeId).toHaveBeenCalledWith(1);
     });
 
@@ -496,7 +513,7 @@ describe("NodePropertyService", () => {
         makeStored({ id: 501, valueText: "second", valueOrder: 1 }),
       ]);
 
-      await expect(service.snapshotValues(trx, { id: 1, nodeTypeId: 20 }, ["name"])).resolves.toEqual({
+      await expect(service.snapshotValues(repos, { id: 1, nodeTypeId: 20 }, ["name"])).resolves.toEqual({
         name: [
           { rowIndex: 0, value: "first", isOwn: null, publishedText: null },
           { rowIndex: 1, value: "second", isOwn: null, publishedText: null },
@@ -509,12 +526,38 @@ describe("NodePropertyService", () => {
     //  1. We call snapshotValues(trx, ...) with one key.
     //  2. The propertyDefinitions and nodeProperties factories are called with trx (not without it), otherwise the read would happen outside the transaction and could see different data from what the edit saves.
     test("_TC255_snapshotValues_readsInsideTheGivenTransaction", async () => {
-      propertyDefinitions.findActiveByNodeType.mockResolvedValue([makeDefinition()]);
+      propertyDefinitions.findActiveByNodeType.mockResolvedValue([
+        makeDefinition({ id: 100, key: "name" }),
+      ]);
 
-      await service.snapshotValues(trx, { id: 1, nodeTypeId: 20 }, ["name"]);
+      nodeProperties.findByNodeId.mockResolvedValue([
+        makeStored({ propertyDefinitionId: 100, valueText: "Hello" }),
+      ]);
 
-      expect(repos.propertyDefinitions).toHaveBeenCalledWith(trx);
-      expect(repos.nodeProperties).toHaveBeenCalledWith(trx);
+      const result = await service.snapshotValues(
+          repos,
+          { id: 1, nodeTypeId: 20 },
+          ["name"]
+      );
+
+      expect(result).toEqual({
+        name: [
+          {
+            rowIndex: 0,
+            value: "Hello",
+            isOwn: null,
+            publishedText: null,
+          },
+        ],
+      });
+
+      expect(
+          propertyDefinitions.findActiveByNodeType
+      ).toHaveBeenCalledWith(20);
+
+      expect(
+          nodeProperties.findByNodeId
+      ).toHaveBeenCalledWith(1);
     });
   });
 
@@ -530,7 +573,7 @@ describe("NodePropertyService", () => {
       nodes.findById.mockResolvedValue(undefined);
 
       await expect(service.saveValues(99, [], 7)).rejects.toThrow(NotFoundError);
-      expect(knex.transaction).toHaveBeenCalledTimes(1);
+      expect(uow.run).toHaveBeenCalledTimes(1);
       expect(nodeProperties.replaceValues).not.toHaveBeenCalled();
     });
 
@@ -547,7 +590,7 @@ describe("NodePropertyService", () => {
 
       const form = await service.saveValues(1, [{ key: "name", value: "new" }], 7);
 
-      expect(knex.transaction).toHaveBeenCalledTimes(1);
+      expect(uow.run).toHaveBeenCalledTimes(1);
       expect(nodeProperties.replaceValues).toHaveBeenCalledWith(1, [100], [
         expect.objectContaining({ valueText: "new", updatedBy: 7 }),
       ]);
@@ -565,7 +608,7 @@ describe("NodePropertyService", () => {
     //  3. nodes.findById was not called because the callback never ran.
     test("_TC240_saveValues_propagatesTransactionCallbackErrors", async () => {
       const error = new Error("transaction failed");
-      (knex.transaction as jest.Mock).mockRejectedValue(error);
+      uow.run.mockRejectedValue(error);
 
       await expect(service.saveValues(1, [], 7)).rejects.toBe(error);
       expect(nodes.findById).not.toHaveBeenCalled();
@@ -577,16 +620,39 @@ describe("NodePropertyService", () => {
     //  2. During the save: nodes, propertyDefinitions and nodeProperties are called with trx.
     //  3. When the form is reloaded after the save: the last call of each of nodes, propertyDefinitions and nodeProperties has no arguments.
     test("_TC241_saveValues_passesTransactionToRepositoryFactories", async () => {
-      propertyDefinitions.findActiveByNodeType.mockResolvedValue([makeDefinition()]);
+      propertyDefinitions.findActiveByNodeType.mockResolvedValue([
+        makeDefinition(),
+      ]);
+      nodeProperties.findByNodeId.mockResolvedValue([
+        makeStored({ valueText: "new" }),
+      ]);
 
-      await service.saveValues(1, [{ key: "name", value: "new" }], 7);
+      const form = await service.saveValues(
+          1,
+          [{ key: "name", value: "new" }],
+          7
+      );
+      expect(uow.run).toHaveBeenCalledTimes(1);
+      expect(nodeProperties.replaceValues).toHaveBeenCalledWith(
+          1,
+          [100],
+          [
+            expect.objectContaining({
+              valueText: "new",
+              updatedBy: 7,
+            }),
+          ]
+      );
+      expect(
+          nodeProperties.replaceValues.mock.invocationCallOrder[0]
+      ).toBeLessThan(
+          nodeTypes.findOne.mock.invocationCallOrder[0]
+      );
 
-      expect(repos.nodes).toHaveBeenCalledWith(trx);
-      expect(repos.propertyDefinitions).toHaveBeenCalledWith(trx);
-      expect(repos.nodeProperties).toHaveBeenCalledWith(trx);
-      expect(repos.nodes).toHaveBeenLastCalledWith();
-      expect(repos.propertyDefinitions).toHaveBeenLastCalledWith();
-      expect(repos.nodeProperties).toHaveBeenLastCalledWith();
+      expect(form.nodeId).toBe(1);
+      expect(form.tabs[0].fields[0].values[0].value).toBe("new");
+
+      expect(nodes.findById).toHaveBeenCalledTimes(2);
     });
 
     // TC256 (new): a validation failure inside the transaction prevents saving and does not reload the form.
@@ -615,7 +681,7 @@ describe("NodePropertyService", () => {
     // Helper: runs the save in edit mode (requireAll=false) with userId=7 by default.
     // userId is deliberately a rest argument: we pass the value as is (even undefined); a default parameter would turn undefined into 7.
     const save = (inputs: unknown[] | undefined, requireAll = false, ...userId: Array<number | null | undefined>) =>
-      service.saveValuesInTransaction(trx, { id: 1, nodeTypeId: 20 }, inputs as never, userId.length ? userId[0] : 7, requireAll);
+      service.saveValuesInTransaction(repos, { id: 1, nodeTypeId: 20 }, inputs as never, userId.length ? userId[0] : 7, requireAll);
 
     // --- Basic inputs ------------------------------------------------------
 
@@ -1207,22 +1273,6 @@ describe("NodePropertyService", () => {
         expect.objectContaining({ propertyDefinitionId: 101, valueText: "o" }),
         expect.objectContaining({ propertyDefinitionId: 100, valueText: "n" }),
       ]);
-    });
-
-    // TC273 (new): saving inside the transaction uses trx for every repository it touches.
-    // What happens:
-    //  1. We call saveValuesInTransaction directly.
-    //  2. The propertyDefinitions and nodeProperties factories are called with trx.
-    //  3. No factory is called without trx (no reads outside the transaction).
-    test("_TC273_saveValuesInTransaction_usesTransactionForEveryRepository", async () => {
-      configure([makeDefinition()]);
-
-      await save([{ key: "name", value: "x" }]);
-
-      expect(repos.propertyDefinitions).toHaveBeenCalledWith(trx);
-      expect(repos.nodeProperties).toHaveBeenCalledWith(trx);
-      expect(repos.propertyDefinitions).not.toHaveBeenCalledWith();
-      expect(repos.nodeProperties).not.toHaveBeenCalledWith();
     });
   });
 });

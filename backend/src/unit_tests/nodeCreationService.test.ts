@@ -1,36 +1,13 @@
-/**
- Unit tests for NodeCreationService (services/nodeCreationService.ts).
- The repositories and the NodePropertyService are handed to the constructor, so there is no
- jest.mock here: the tests pass plain objects full of jest.fn(). knex.transaction is faked, it
- just runs the callback right away with a dummy trx. Nothing here touches any db.
- Covers createNode from start to end: missing structure, unknown node type, node type of the
- wrong structure type, root rules (allowed and not allowed), parent checks (missing, other
- structure, child type not allowed), the duplicate reference code check and the save of the
- property values in the same transaction.
 
-
- Test Naming Convention: _TCnnn_<function>_<description> (for verification-doc match!)
-
- IMPORTANT : test IDs are permanent!!
-  - never renumber, reuse or swap an existing TC id, not even to "tidy up" the order.
-    The id links the test to the verification doc and to every old test report.
-  - a new test always gets the next free number across ALL files in src/unit_tests
-    (check the highest TC id first), no matter where in the file it is placed.
-  - if a test is removed, its id is retired and not given to another test.
-  - renaming the description part is ok, the TCnnn part stays.
- */
-
-
-import type { Knex } from 'knex';
 import type { Node } from '../models/node/node';
 import type { NodeType } from '../models/node/nodeType';
 import type { Structure } from '../models/structure/structure';
+import type { UnitOfWork } from '../config/db';
+import type { NodeEditProperties } from '../services/nodeEditService';
 import { ConflictError, NotFoundError, ValidationError } from '../services/errorService';
 import {
     NodeCreationService,
     type CreateNodeRequest,
-    type NodeCreationProperties,
-    type NodeCreationRepos,
 } from '../services/nodeCreationService';
 
 
@@ -116,8 +93,8 @@ describe('NodeCreationService', () => {
     let nodeTypes: { findByCode: jest.Mock; isAllowedChild: jest.Mock };
     let nodes: { findById: jest.Mock; existsByStructureParentAndReferenceCode: jest.Mock; createNode: jest.Mock };
     let properties: { saveValuesInTransaction: jest.Mock };
-    let trx: Knex.Transaction;
-    let knex: Knex;
+    let repos: any;
+    let uow: UnitOfWork;
     let service: NodeCreationService;
 
     beforeEach(() => {
@@ -134,19 +111,23 @@ describe('NodeCreationService', () => {
         nodes.createNode.mockResolvedValue(makeNode({ id: 99 }));
         properties.saveValuesInTransaction.mockResolvedValue(undefined);
 
-        trx = { isTrx: true } as unknown as Knex.Transaction;
-        knex = {
-            transaction: jest.fn(async (cb: (t: Knex.Transaction) => Promise<unknown>) => cb(trx)),
-        } as unknown as Knex;
+        // The repositories are objects, not functions.
+        // UnitOfWork passes these repositories to the callback.
+        repos = {
+            structures,
+            nodeTypes,
+            nodes,
+        };
 
-        // the repos are functions that give back the fake, like createRepositories() does
-        const repos = {
-            structures: () => structures,
-            nodeTypes: () => nodeTypes,
-            nodes: () => nodes,
-        } as unknown as NodeCreationRepos;
+        // UnitOfWork is faked and executes the callback with the mocked repositories.
+        uow = {
+            run: jest.fn(async (callback: (repos: any) => Promise<unknown>) => callback(repos)),
+        } as unknown as UnitOfWork;
 
-        service = new NodeCreationService(knex, repos, properties as unknown as NodeCreationProperties);
+        service = new NodeCreationService(
+            uow,
+            properties as unknown as NodeEditProperties
+        );
     });
 
 
@@ -238,13 +219,11 @@ describe('NodeCreationService', () => {
             expect(nodes.createNode).toHaveBeenCalledWith(expect.objectContaining({ parentId: null, nodeTypeId: 200 }));
         });
 
-
         /*
          Verifies that a parent id that does not exist gives a NotFoundError.
          */
         test('_TC205_createNode_rejectsMissingParent', async () => {
             nodes.findById.mockResolvedValue(undefined);
-
             await expect(service.createNode(makeRequest())).rejects.toThrow(NotFoundError);
             await expect(service.createNode(makeRequest())).rejects.toThrow('Parent node 5 was not found');
             expect(nodes.createNode).not.toHaveBeenCalled();
@@ -292,7 +271,6 @@ describe('NodeCreationService', () => {
             expect(nodes.createNode).not.toHaveBeenCalled();
         });
 
-
         /*
          Verifies that a node without reference code skips the duplicate check, and that the
          created node is returned.
@@ -304,28 +282,26 @@ describe('NodeCreationService', () => {
             expect(result.id).toBe(99);
         });
 
-
         /*
          Verifies the full happy path: the node is built from the request and the node type id,
-         and the property values are saved with the SAME trx, the creating user and
-         requireAll = true (every required field must be present when a node is created).
+         and the property values are saved with the SAME UnitOfWork repositories, the creating
+         user and requireAll = true (every required field must be present when a node is created).
          */
         test('_TC210_createNode_savesNodeAndPropertiesInSameTransaction', async () => {
             const inputs = [{ key: 'beskrivning', value: 'Text' }];
 
             await service.createNode(makeRequest({ referenceCode: 'A.1', properties: inputs }));
 
-            expect(knex.transaction).toHaveBeenCalledTimes(1);
+            expect(uow.run).toHaveBeenCalledTimes(1);
             expect(nodes.createNode).toHaveBeenCalledWith(expect.objectContaining({
                 structureId: 10, parentId: 5, nodeTypeId: 200, referenceCode: 'A.1', title: 'Ny nod', createdBy: 7,
             }));
-            expect(properties.saveValuesInTransaction).toHaveBeenCalledWith(trx, expect.objectContaining({ id: 99 }), inputs, 7, true);
+            expect(properties.saveValuesInTransaction).toHaveBeenCalledWith(repos, expect.objectContaining({ id: 99 }), inputs, 7, true);
         });
-
 
         /*
          Verifies that an invalid property value makes createNode fail with that error: the
-         error leaves the transaction callback, so the real knex rolls the new node back.
+         error leaves the UnitOfWork callback, so the real UnitOfWork rolls the new node back.
          */
         test('_TC211_createNode_propagatesPropertyErrorSoTheTransactionRollsBack', async () => {
             properties.saveValuesInTransaction.mockRejectedValue(new ValidationError("Field 'Namn' is required"));

@@ -308,11 +308,23 @@ export class NodePropertyService {
 
       case "date": {
         const text = String(raw).trim();
-        const ok = /^\d{4}-\d{2}-\d{2}$/.test(text) && !Number.isNaN(Date.parse(text));
-        if (!ok) throw bad("a date as YYYY-MM-DD");
+
+        const hasCorrectFormat = /^\d{4}-\d{2}-\d{2}$/.test(text);
+
+        if (!hasCorrectFormat) {
+          throw bad("a date as YYYY-MM-DD");
+        }
+        const parsedDate = new Date(`${text}T00:00:00.000Z`);
+        const isValidDate =
+            !Number.isNaN(parsedDate.getTime()) &&
+            parsedDate.toISOString().slice(0, 10) === text;
+
+        if (!isValidDate) {
+          throw bad("a date as YYYY-MM-DD");
+        }
+
         return { ...EMPTY, valueDate: text };
       }
-
       case "boolean": {
         if (typeof raw === "boolean") return { ...EMPTY, valueBoolean: raw };
         if (raw === "true" || raw === "false") return { ...EMPTY, valueBoolean: raw === "true" };
